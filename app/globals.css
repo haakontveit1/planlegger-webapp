@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: #0A0A10;
+  color: #FFFFFF;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  height: 100%;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2E2E42; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #404060; }
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid #7B72FF;
+  outline-offset: 2px;
+}
+
+/* Checkbox pop animation */
+@keyframes check-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.check-pop { animation: check-pop 200ms ease-out; }
+
+/* Progress bar */
+.progress-track {
+  background: #2E2E42;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 500ms ease-out;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Task row hover */
+.task-row { transition: background 120ms ease; }
+.task-row:hover { background: rgba(255, 255, 255, 0.04); }
+
+/* Chip styles */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 150ms ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+}
+.chip-inactive {
+  border-color: #2E2E42;
+  color: #A0A0C0;
+  background: transparent;
+}
+.chip-inactive:hover {
+  border-color: #7B72FF;
+  color: #FFFFFF;
+}
+.chip-active {
+  background: #7B72FF;
+  color: white;
+  border-color: #7B72FF;
+}
+
+/* Section label */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8888B0;
+}
+
+/* Input base */
+.input-base {
+  width: 100%;
+  background: #13131C;
+  border: 1.5px solid #2E2E42;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 15px;
+  color: #FFFFFF;
+  transition: border-color 150ms;
+}
+.input-base::placeholder { color: #6A6A90; }
+.input-base:focus { outline: none; border-color: #7B72FF; }
