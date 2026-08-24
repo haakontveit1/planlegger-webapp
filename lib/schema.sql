@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS buy_items (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  is_range BOOLEAN NOT NULL DEFAULT FALSE,
+  price_estimate NUMERIC,
+  price_min NUMERIC,
+  price_max NUMERIC,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS weekly_goals (
   id TEXT PRIMARY KEY,
   week_start TEXT NOT NULL,
