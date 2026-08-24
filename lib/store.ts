@@ -93,15 +93,17 @@ export const useStore = create<AppState>((set, get) => ({
   loadAll: async () => {
     const today = todayISO();
     const weekStart = weekStartISO();
+    const safeJson = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const safeArr = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
     const [tasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal] =
       await Promise.all([
-        apiFetch("/api/tasks").then((r) => r.json()),
-        apiFetch("/api/projects").then((r) => r.json()),
-        apiFetch("/api/routines").then((r) => r.json()),
-        apiFetch(`/api/routine-sessions?date=${today}`).then((r) => r.json()),
-        apiFetch("/api/brain-dump").then((r) => r.json()),
-        fetch(`/api/journal/${today}`).then((r) => (r.ok ? r.json() : null)),
-        fetch(`/api/dev-goals/${weekStart}`).then((r) => (r.ok ? r.json() : null)),
+        safeArr(fetch("/api/tasks")),
+        safeArr(fetch("/api/projects")),
+        safeArr(fetch("/api/routines")),
+        safeArr(fetch(`/api/routine-sessions?date=${today}`)),
+        safeArr(fetch("/api/brain-dump")),
+        safeJson(fetch(`/api/journal/${today}`)),
+        safeJson(fetch(`/api/dev-goals/${weekStart}`)),
       ]);
     set({ tasks, projects, routines, routineSessions, brainDumpItems,
           journalEntry: journalEntry ?? null, devGoal: devGoal ?? null });

@@ -16,8 +16,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const weekStart = searchParams.get("weekStart");
   const rows = weekStart
-    ? await sql`SELECT * FROM weekly_goals WHERE week_start = ${weekStart} ORDER BY rowid ASC`
-    : await sql`SELECT * FROM weekly_goals ORDER BY rowid ASC`;
+    ? await sql`SELECT * FROM weekly_goals WHERE week_start = ${weekStart}`
+    : await sql`SELECT * FROM weekly_goals`;
   return NextResponse.json(rows.map(rowToGoal));
 }
 
