@@ -1,5 +1,5 @@
 "use client";
-import { use, useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
@@ -15,8 +15,8 @@ interface ProjectNote {
   createdAt: string;
 }
 
-export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProjectDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const projects = useStore((s) => s.projects);
   const tasks = useStore((s) => s.tasks);
   const toggleTask = useStore((s) => s.toggleTask);

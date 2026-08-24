@@ -190,6 +190,7 @@ export default function PlannerPage() {
   const moveToToday = useStore((s) => s.moveToToday);
   const reorderTasks = useStore((s) => s.reorderTasks);
   const addBrainDump = useStore((s) => s.addBrainDump);
+  const deleteTask = useStore((s) => s.deleteTask);
 
   const [durationPrompt, setDurationPrompt] = useState<string | null>(null);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
@@ -283,7 +284,7 @@ export default function PlannerPage() {
               items={displayTasks}
               onReorder={handleReorder}
               renderItem={(task) => (
-                <div className="task-row flex items-center gap-3 px-3 py-3 rounded-xl">
+                <div className="task-row flex items-center gap-3 px-3 py-3 rounded-xl group">
                   <Checkbox checked={task.status === "completed"} onChange={() => toggleTask(task.id)} size={18} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
@@ -302,6 +303,10 @@ export default function PlannerPage() {
                   <button onClick={() => moveToBacklog(task.id)}
                     className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
                     ← backlog
+                  </button>
+                  <button onClick={() => deleteTask(task.id)}
+                    className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
+                    ✕
                   </button>
                 </div>
               )}
@@ -348,7 +353,7 @@ export default function PlannerPage() {
             ) : (
               <div className="space-y-1 max-h-[50vh] overflow-y-auto">
                 {backlogTasks.map((task) => (
-                  <div key={task.id} className="task-row flex items-center gap-2 px-2 py-2.5 rounded-lg">
+                  <div key={task.id} className="task-row flex items-center gap-2 px-2 py-2.5 rounded-lg group">
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-textSecondary">{task.title}</span>
                       {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate">{task.notes}</p>}
@@ -359,6 +364,10 @@ export default function PlannerPage() {
                     <button onClick={() => handleMoveToToday(task.id)}
                       className="text-xs text-accent hover:text-accentLight font-medium transition-colors px-2 py-1 rounded hover:bg-accent/10 shrink-0">
                       → {isToday ? "today" : "this day"}
+                    </button>
+                    <button onClick={() => deleteTask(task.id)}
+                      className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
+                      ✕
                     </button>
                   </div>
                 ))}
