@@ -1,5 +1,3 @@
-import Dexie, { type Table } from "dexie";
-
 export interface Task {
   id: string;
   title: string;
@@ -102,41 +100,3 @@ export interface WeeklyReview {
   reflection: string;
   completedAt: string;
 }
-
-class PlanleggerDB extends Dexie {
-  tasks!: Table<Task>;
-  projects!: Table<Project>;
-  routines!: Table<Routine>;
-  routineSessions!: Table<RoutineSession>;
-  brainDumpItems!: Table<BrainDumpItem>;
-  journalEntries!: Table<JournalEntry>;
-  wishlistItems!: Table<WishlistItem>;
-  devGoals!: Table<DevGoal>;
-  weeklyGoals!: Table<WeeklyGoal>;
-  weeklyReviews!: Table<WeeklyReview>;
-
-  constructor() {
-    super("planlegger");
-    this.version(2).stores({
-      tasks: "id, lane, status, isBacklog, dueDate, customer, category, projectId",
-      projects: "id, category, createdAt",
-      routines: "id, projectId, createdAt",
-      routineSessions: "id, routineId, date, status",
-      brainDumpItems: "id, createdAt",
-      journalEntries: "id, &date",
-      wishlistItems: "id, createdAt",
-      devGoals: "id, &weekStart",
-      weeklyGoals: "id, weekStart",
-      weeklyReviews: "id, &weekStart",
-    });
-    this.version(3).stores({
-      tasks: "id, lane, status, isBacklog, dueDate, customer, category, projectId, sortOrder",
-    }).upgrade((tx) =>
-      tx.table("tasks").toCollection().modify((task) => {
-        if (task.sortOrder == null) task.sortOrder = new Date(task.createdAt).getTime();
-      })
-    );
-  }
-}
-
-export const db = new PlanleggerDB();

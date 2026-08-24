@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import { db, Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession } from "./db";
+import { Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession } from "./db";
 import { todayISO, weekStartISO, now, newId } from "./utils";
 
 interface AppState {
@@ -17,7 +17,6 @@ interface AppState {
   setSelectedDate: (date: string) => void;
   loadAll: () => Promise<void>;
 
-  // Tasks
   addTask: (t: Omit<Task, "id" | "createdAt" | "updatedAt" | "sortOrder">) => Promise<Task>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -26,31 +25,56 @@ interface AppState {
   updateTaskDuration: (id: string, durationMinutes: number | null) => Promise<void>;
   reorderTasks: (orderedIds: string[]) => Promise<void>;
 
-  // Projects
   addProject: (p: Omit<Project, "id" | "createdAt" | "updatedAt">) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
 
-  // Routines
   addRoutine: (r: Omit<Routine, "id" | "createdAt" | "updatedAt">) => Promise<Routine>;
   deleteRoutine: (id: string) => Promise<void>;
   scheduleRoutine: (routineId: string, durationMinutes: number) => Promise<void>;
   toggleRoutineSession: (sessionId: string) => Promise<void>;
   deleteRoutineSession: (sessionId: string) => Promise<void>;
 
-  // Brain dump
   addBrainDump: (text: string, notes?: string) => Promise<void>;
   updateBrainDumpNotes: (id: string, notes: string) => Promise<void>;
   sortBrainDump: (id: string, lane: "work" | "afterwork" | "delete") => Promise<void>;
   deleteBrainDump: (id: string) => Promise<void>;
 
-  // Journal
   saveJournal: (entry: Omit<JournalEntry, "id" | "createdAt" | "updatedAt">) => Promise<void>;
   loadJournal: (date: string) => Promise<void>;
 
-  // Dev goal
   setDevGoalHours: (hours: number) => Promise<void>;
 
   toggleSound: () => void;
+}
+
+async function apiFetch(path: string, options?: RequestInit) {
+  const res = await fetch(path, options);
+  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  return res;
+}
+
+function jsonPost(path: string, body: unknown) {
+  return apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function jsonPatch(path: string, body: unknown) {
+  return apiFetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function jsonPut(path: string, body: unknown) {
+  return apiFetch(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -69,22 +93,23 @@ export const useStore = create<AppState>((set, get) => ({
   loadAll: async () => {
     const today = todayISO();
     const weekStart = weekStartISO();
-    const [tasks, projects, routines, routineSessions, brainDumpItems] = await Promise.all([
-      db.tasks.toArray(),
-      db.projects.orderBy("createdAt").toArray(),
-      db.routines.orderBy("createdAt").toArray(),
-      db.routineSessions.where("date").equals(today).toArray(),
-      db.brainDumpItems.orderBy("createdAt").toArray(),
-    ]);
-    const journalEntry = await db.journalEntries.where("date").equals(today).first() ?? null;
-    const devGoal = await db.devGoals.where("weekStart").equals(weekStart).first() ?? null;
-    set({ tasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal });
+    const [tasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal] =
+      await Promise.all([
+        apiFetch("/api/tasks").then((r) => r.json()),
+        apiFetch("/api/projects").then((r) => r.json()),
+        apiFetch("/api/routines").then((r) => r.json()),
+        apiFetch(`/api/routine-sessions?date=${today}`).then((r) => r.json()),
+        apiFetch("/api/brain-dump").then((r) => r.json()),
+        fetch(`/api/journal/${today}`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/dev-goals/${weekStart}`).then((r) => (r.ok ? r.json() : null)),
+      ]);
+    set({ tasks, projects, routines, routineSessions, brainDumpItems,
+          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null });
   },
 
   addTask: async (partial) => {
-    const sortOrder = Date.now();
-    const task: Task = { ...partial, sortOrder, id: newId(), createdAt: now(), updatedAt: now() };
-    await db.tasks.add(task);
+    const task: Task = { ...partial, sortOrder: Date.now(), id: newId(), createdAt: now(), updatedAt: now() };
+    await jsonPost("/api/tasks", task);
     set((s) => ({ tasks: [...s.tasks, task] }));
     return task;
   },
@@ -92,131 +117,125 @@ export const useStore = create<AppState>((set, get) => ({
   toggleTask: async (id) => {
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
-    const next = task.status === "completed" ? "pending" : "completed";
-    const completedAt = next === "completed" ? now() : null;
-    await db.tasks.update(id, { status: next, completedAt, updatedAt: now() });
-    set((s) => ({ tasks: s.tasks.map((t) => t.id === id ? { ...t, status: next, completedAt } : t) }));
+    const status: Task["status"] = task.status === "completed" ? "pending" : "completed";
+    const completedAt = status === "completed" ? now() : null;
+    const updated = { ...task, status, completedAt, updatedAt: now() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+    await jsonPatch(`/api/tasks/${id}`, updated);
   },
 
   deleteTask: async (id) => {
-    await db.tasks.delete(id);
     set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+    await apiFetch(`/api/tasks/${id}`, { method: "DELETE" });
   },
 
   moveToToday: async (id, durationMinutes) => {
-    const today = todayISO();
-    const updates: Partial<Task> = { isBacklog: false, dueDate: today, updatedAt: now() };
-    if (durationMinutes !== undefined) updates.durationMinutes = durationMinutes;
-    await db.tasks.update(id, updates);
-    set((s) => ({ tasks: s.tasks.map((t) => t.id === id ? { ...t, ...updates } : t) }));
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task) return;
+    const updated = { ...task, isBacklog: false, dueDate: todayISO(), updatedAt: now(),
+      ...(durationMinutes !== undefined ? { durationMinutes } : {}) };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+    await jsonPatch(`/api/tasks/${id}`, updated);
   },
 
   moveToBacklog: async (id) => {
-    await db.tasks.update(id, { isBacklog: true, dueDate: null, updatedAt: now() });
-    set((s) => ({ tasks: s.tasks.map((t) => t.id === id ? { ...t, isBacklog: true, dueDate: null } : t) }));
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task) return;
+    const updated = { ...task, isBacklog: true, dueDate: null, updatedAt: now() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+    await jsonPatch(`/api/tasks/${id}`, updated);
   },
 
   updateTaskDuration: async (id, durationMinutes) => {
-    await db.tasks.update(id, { durationMinutes, updatedAt: now() });
-    set((s) => ({ tasks: s.tasks.map((t) => t.id === id ? { ...t, durationMinutes } : t) }));
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task) return;
+    const updated = { ...task, durationMinutes, updatedAt: now() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+    await jsonPatch(`/api/tasks/${id}`, updated);
   },
 
   reorderTasks: async (orderedIds) => {
-    const updates = orderedIds.map((id, i) => ({ id, sortOrder: i * 1000 }));
-    await Promise.all(updates.map(({ id, sortOrder }) => db.tasks.update(id, { sortOrder })));
-    set((s) => {
-      const orderMap = new Map(updates.map(({ id, sortOrder }) => [id, sortOrder]));
-      return { tasks: s.tasks.map((t) => orderMap.has(t.id) ? { ...t, sortOrder: orderMap.get(t.id)! } : t) };
-    });
+    const orderMap = new Map(orderedIds.map((id, i) => [id, i * 1000]));
+    set((s) => ({ tasks: s.tasks.map((t) => orderMap.has(t.id) ? { ...t, sortOrder: orderMap.get(t.id)! } : t) }));
+    await jsonPost("/api/tasks/reorder", { orderedIds });
   },
 
   addProject: async (partial) => {
     const project: Project = { ...partial, id: newId(), createdAt: now(), updatedAt: now() };
-    await db.projects.add(project);
+    await jsonPost("/api/projects", project);
     set((s) => ({ projects: [...s.projects, project] }));
     return project;
   },
 
   deleteProject: async (id) => {
-    await db.projects.delete(id);
-    // Unlink tasks
-    const affected = get().tasks.filter((t) => t.projectId === id);
-    await Promise.all(affected.map((t) => db.tasks.update(t.id, { projectId: null })));
     set((s) => ({
       projects: s.projects.filter((p) => p.id !== id),
-      tasks: s.tasks.map((t) => t.projectId === id ? { ...t, projectId: null } : t),
+      tasks: s.tasks.map((t) => (t.projectId === id ? { ...t, projectId: null } : t)),
     }));
+    await apiFetch(`/api/projects/${id}`, { method: "DELETE" });
   },
 
   addRoutine: async (partial) => {
     const routine: Routine = { ...partial, id: newId(), createdAt: now(), updatedAt: now() };
-    await db.routines.add(routine);
+    await jsonPost("/api/routines", routine);
     set((s) => ({ routines: [...s.routines, routine] }));
     return routine;
   },
 
   deleteRoutine: async (id) => {
-    await db.routines.delete(id);
     set((s) => ({ routines: s.routines.filter((r) => r.id !== id) }));
+    await apiFetch(`/api/routines/${id}`, { method: "DELETE" });
   },
 
   scheduleRoutine: async (routineId, durationMinutes) => {
-    const today = todayISO();
     const session: RoutineSession = {
-      id: newId(),
-      routineId,
-      durationMinutes,
-      date: today,
-      status: "pending",
-      completedAt: null,
-      createdAt: now(),
+      id: newId(), routineId, durationMinutes, date: todayISO(),
+      status: "pending", completedAt: null, createdAt: now(),
     };
-    await db.routineSessions.add(session);
+    await jsonPost("/api/routine-sessions", session);
     set((s) => ({ routineSessions: [...s.routineSessions, session] }));
   },
 
   toggleRoutineSession: async (sessionId) => {
     const session = get().routineSessions.find((s) => s.id === sessionId);
     if (!session) return;
-    const next = session.status === "completed" ? "pending" : "completed";
-    const completedAt = next === "completed" ? now() : null;
-    await db.routineSessions.update(sessionId, { status: next, completedAt });
+    const status = session.status === "completed" ? "pending" : "completed";
+    const completedAt = status === "completed" ? now() : null;
     set((s) => ({
       routineSessions: s.routineSessions.map((rs) =>
-        rs.id === sessionId ? { ...rs, status: next, completedAt } : rs
+        rs.id === sessionId ? { ...rs, status, completedAt } : rs
       ),
     }));
+    await jsonPatch(`/api/routine-sessions/${sessionId}`, { status, completedAt });
   },
 
   deleteRoutineSession: async (sessionId) => {
-    await db.routineSessions.delete(sessionId);
     set((s) => ({ routineSessions: s.routineSessions.filter((rs) => rs.id !== sessionId) }));
+    await apiFetch(`/api/routine-sessions/${sessionId}`, { method: "DELETE" });
   },
 
   addBrainDump: async (text, notes) => {
     const item: BrainDumpItem = { id: newId(), text, notes: notes ?? null, createdAt: now() };
-    await db.brainDumpItems.add(item);
+    await jsonPost("/api/brain-dump", item);
     set((s) => ({ brainDumpItems: [...s.brainDumpItems, item] }));
   },
 
   updateBrainDumpNotes: async (id, notes) => {
-    await db.brainDumpItems.update(id, { notes });
-    set((s) => ({
-      brainDumpItems: s.brainDumpItems.map((b) => b.id === id ? { ...b, notes } : b),
-    }));
+    set((s) => ({ brainDumpItems: s.brainDumpItems.map((b) => (b.id === id ? { ...b, notes } : b)) }));
+    await jsonPatch(`/api/brain-dump/${id}`, { notes });
   },
 
   sortBrainDump: async (id, lane) => {
     const item = get().brainDumpItems.find((b) => b.id === id);
     if (!item) return;
-    await db.brainDumpItems.delete(id);
     set((s) => ({ brainDumpItems: s.brainDumpItems.filter((b) => b.id !== id) }));
+    await apiFetch(`/api/brain-dump/${id}`, { method: "DELETE" });
     if (lane === "delete") return;
     await get().addTask({
       title: item.text,
       notes: null,
       status: "pending",
-      category: lane === "work" ? "work" : "private",
+      category: "private",
       lane,
       customer: null,
       durationMinutes: null,
@@ -229,39 +248,33 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   deleteBrainDump: async (id) => {
-    await db.brainDumpItems.delete(id);
     set((s) => ({ brainDumpItems: s.brainDumpItems.filter((b) => b.id !== id) }));
+    await apiFetch(`/api/brain-dump/${id}`, { method: "DELETE" });
   },
 
   saveJournal: async (partial) => {
-    const existing = await db.journalEntries.where("date").equals(partial.date).first();
-    if (existing) {
-      const updated = { ...existing, ...partial, updatedAt: now() };
-      await db.journalEntries.put(updated);
-      set({ journalEntry: updated });
-    } else {
-      const entry: JournalEntry = { ...partial, id: newId(), createdAt: now(), updatedAt: now() };
-      await db.journalEntries.add(entry);
-      set({ journalEntry: entry });
-    }
+    const existing = get().journalEntry;
+    const entry: JournalEntry = existing
+      ? { ...existing, ...partial, updatedAt: now() }
+      : { ...partial, id: newId(), createdAt: now(), updatedAt: now() };
+    await jsonPut(`/api/journal/${partial.date}`, entry);
+    set({ journalEntry: entry });
   },
 
   loadJournal: async (date) => {
-    const entry = await db.journalEntries.where("date").equals(date).first() ?? null;
+    const res = await fetch(`/api/journal/${date}`);
+    const entry = res.ok ? await res.json() : null;
     set({ journalEntry: entry });
   },
 
   setDevGoalHours: async (hours) => {
     const weekStart = weekStartISO();
-    const existing = await db.devGoals.where("weekStart").equals(weekStart).first();
-    if (existing) {
-      await db.devGoals.update(existing.id, { targetHours: hours });
-      set({ devGoal: { ...existing, targetHours: hours } });
-    } else {
-      const goal: DevGoal = { id: newId(), weekStart, targetHours: hours, loggedMinutes: 0 };
-      await db.devGoals.add(goal);
-      set({ devGoal: goal });
-    }
+    const existing = get().devGoal;
+    const goal: DevGoal = existing
+      ? { ...existing, targetHours: hours }
+      : { id: newId(), weekStart, targetHours: hours, loggedMinutes: 0 };
+    await jsonPut(`/api/dev-goals/${weekStart}`, goal);
+    set({ devGoal: goal });
   },
 
   toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),

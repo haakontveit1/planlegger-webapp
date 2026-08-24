@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { db, WeeklyGoal } from "@/lib/db";
+import { WeeklyGoal } from "@/lib/db";
 import { weekStartISO, newId } from "@/lib/utils";
 
 function getWeekLabel(): string {
@@ -18,20 +18,20 @@ export default function PlannerPage() {
   const weekStart = weekStartISO();
 
   useEffect(() => {
-    db.weeklyGoals.where("weekStart").equals(weekStart).toArray().then(setGoals);
+    fetch(`/api/weekly-goals?weekStart=${weekStart}`)
+      .then((r) => r.json())
+      .then(setGoals);
   }, [weekStart]);
 
   async function addGoal(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim()) return;
-    const goal: WeeklyGoal = {
-      id: newId(),
-      weekStart,
-      text: input.trim(),
-      isWish: false,
-      achieved: false,
-    };
-    await db.weeklyGoals.add(goal);
+    const goal: WeeklyGoal = { id: newId(), weekStart, text: input.trim(), isWish: false, achieved: false };
+    await fetch("/api/weekly-goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(goal),
+    });
     setGoals((prev) => [...prev, goal]);
     setInput("");
   }
@@ -40,12 +40,16 @@ export default function PlannerPage() {
     const goal = goals.find((g) => g.id === id);
     if (!goal) return;
     const achieved = !goal.achieved;
-    await db.weeklyGoals.update(id, { achieved });
-    setGoals((prev) => prev.map((g) => g.id === id ? { ...g, achieved } : g));
+    await fetch(`/api/weekly-goals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ achieved }),
+    });
+    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, achieved } : g)));
   }
 
   async function deleteGoal(id: string) {
-    await db.weeklyGoals.delete(id);
+    await fetch(`/api/weekly-goals/${id}`, { method: "DELETE" });
     setGoals((prev) => prev.filter((g) => g.id !== id));
   }
 
@@ -59,7 +63,6 @@ export default function PlannerPage() {
         <p className="text-sm text-textMuted mt-1">{getWeekLabel()}</p>
       </div>
 
-      {/* Add goal */}
       <form onSubmit={addGoal} className="flex gap-2 mb-8">
         <input
           type="text"
@@ -78,7 +81,6 @@ export default function PlannerPage() {
         </button>
       </form>
 
-      {/* Pending */}
       {pending.length === 0 && done.length === 0 ? (
         <div className="text-center py-16 text-textMuted">
           <p className="text-xl mb-2">Nothing planned yet</p>
@@ -104,7 +106,6 @@ export default function PlannerPage() {
         </div>
       )}
 
-      {/* Done */}
       {done.length > 0 && (
         <div>
           <h2 className="section-label mb-3">Done ({done.length})</h2>
