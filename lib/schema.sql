@@ -69,6 +69,13 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS project_notes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS buy_items (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

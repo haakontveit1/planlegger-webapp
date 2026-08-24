@@ -1,5 +1,5 @@
 "use client";
-import { use, useState, useMemo } from "react";
+import { use, useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
@@ -7,6 +7,13 @@ import Checkbox from "@/components/Checkbox";
 import NewTaskModal from "@/components/NewTaskModal";
 import { SortableList } from "@/components/SortableList";
 import { Task } from "@/lib/db";
+
+interface ProjectNote {
+  id: string;
+  projectId: string;
+  text: string;
+  createdAt: string;
+}
 
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -17,6 +24,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showModal, setShowModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
+
+  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const [noteInput, setNoteInput] = useState("");
+  const [hoveredNote, setHoveredNote] = useState<string | null>(null);
+  const noteInputRef = useRef<HTMLInputElement>(null);
 
   const project = projects.find((p) => p.id === id);
   const projectTasks = tasks.filter((t) => t.projectId === id);
@@ -34,6 +46,36 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const backlogTasks = pendingTasks.filter((t) => t.isBacklog || !t.dueDate);
   const otherTasks = pendingTasks.filter((t) => !t.isBacklog && t.dueDate && t.dueDate !== today);
 
+  useEffect(() => {
+    fetch(`/api/project-notes?projectId=${id}`)
+      .then((r) => r.json())
+      .then((data) => setNotes(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [id]);
+
+  async function addNote() {
+    const text = noteInput.trim();
+    if (!text) return;
+    const note: ProjectNote = {
+      id: crypto.randomUUID(),
+      projectId: id,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setNotes((prev) => [...prev, note]);
+    setNoteInput("");
+    await fetch("/api/project-notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(note),
+    });
+  }
+
+  async function deleteNote(noteId: string) {
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    await fetch(`/api/project-notes/${noteId}`, { method: "DELETE" });
+  }
+
   function handleReorder(newItems: Task[]) {
     setLocalOrder(newItems);
     reorderTasks(newItems.map((t) => t.id));
@@ -43,6 +85,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const pct = projectTasks.length > 0
     ? Math.round((completedTasks.length / projectTasks.length) * 100)
     : 0;
+
+  function formatNoteTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("no-NO", { day: "numeric", month: "short" }) +
+      " " + d.toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
+  }
 
   if (!project) {
     return (
@@ -170,7 +218,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Completed */}
       {completedTasks.length > 0 && (
-        <section>
+        <section className="mb-8">
           <button
             onClick={() => setShowCompleted((v) => !v)}
             className="section-label flex items-center gap-2 mb-4 hover:text-textSecondary transition-colors"
@@ -185,6 +233,60 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           )}
         </section>
       )}
+
+      {/* Notes */}
+      <section className="mt-10">
+        <h2 className="section-label mb-4">Notes</h2>
+        <div className="bg-surface rounded-xl border border-border p-4">
+          <div className="flex gap-2 mb-4">
+            <input
+              ref={noteInputRef}
+              type="text"
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addNote()}
+              placeholder="Quick note or thought..."
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent"
+            />
+            <button
+              onClick={addNote}
+              disabled={!noteInput.trim()}
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40"
+              style={{ background: `${project.color}20`, color: project.color }}
+            >
+              Add
+            </button>
+          </div>
+
+          {notes.length === 0 ? (
+            <p className="text-sm text-textMuted text-center py-4">No notes yet</p>
+          ) : (
+            <div className="space-y-2">
+              {notes.map((note) => (
+                <div
+                  key={note.id}
+                  className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surfaceElevated transition-colors group"
+                  onMouseEnter={() => setHoveredNote(note.id)}
+                  onMouseLeave={() => setHoveredNote(null)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-textPrimary">{note.text}</p>
+                    <p className="text-xs text-textMuted mt-0.5">{formatNoteTime(note.createdAt)}</p>
+                  </div>
+                  {hoveredNote === note.id && (
+                    <button
+                      onClick={() => deleteNote(note.id)}
+                      className="text-xs text-textMuted hover:text-red-400 transition-colors shrink-0 mt-0.5"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {showModal && (
         <NewTaskModal
