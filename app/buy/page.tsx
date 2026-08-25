@@ -24,6 +24,103 @@ function formatPrice(item: BuyItem): string | null {
   return null;
 }
 
+async function patchItem(id: string, patch: Partial<BuyItem>) {
+  await fetch(`/api/buy-items/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
+
+function EditRow({ item, onSave, onCancel }: {
+  item: BuyItem;
+  onSave: (updated: BuyItem) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(item.name);
+  const [isRange, setIsRange] = useState(item.isRange);
+  const [estimate, setEstimate] = useState(item.priceEstimate != null ? String(item.priceEstimate) : "");
+  const [priceMin, setPriceMin] = useState(item.priceMin != null ? String(item.priceMin) : "");
+  const [priceMax, setPriceMax] = useState(item.priceMax != null ? String(item.priceMax) : "");
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { nameRef.current?.focus(); }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    const updated: BuyItem = {
+      ...item,
+      name: name.trim(),
+      isRange,
+      priceEstimate: !isRange && estimate !== "" ? Number(estimate) : null,
+      priceMin: isRange && priceMin !== "" ? Number(priceMin) : null,
+      priceMax: isRange && priceMax !== "" ? Number(priceMax) : null,
+    };
+    await patchItem(item.id, updated);
+    onSave(updated);
+  }
+
+  return (
+    <form onSubmit={save} className="bg-surfaceElevated rounded-xl border border-border px-5 py-4 space-y-3">
+      <input
+        ref={nameRef}
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Item name"
+        className="input-base text-sm"
+      />
+      <div className="flex items-center gap-3">
+        <div className="flex rounded-lg border border-border overflow-hidden text-sm shrink-0">
+          <button type="button" onClick={() => setIsRange(false)}
+            className={`px-3 py-1.5 transition-colors ${!isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"}`}>
+            Estimate
+          </button>
+          <button type="button" onClick={() => setIsRange(true)}
+            className={`px-3 py-1.5 transition-colors ${isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"}`}>
+            Range
+          </button>
+        </div>
+        <span className="text-xs text-textMuted">or leave blank</span>
+      </div>
+      <div className="flex gap-3 items-center">
+        {!isRange ? (
+          <div className="flex-1 relative">
+            <input type="number" value={estimate} onChange={(e) => setEstimate(e.target.value)}
+              placeholder="0" className="input-base w-full pr-10 text-sm" min={0} />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 relative">
+              <input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}
+                placeholder="From" className="input-base w-full pr-10 text-sm" min={0} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
+            </div>
+            <span className="text-textMuted shrink-0">–</span>
+            <div className="flex-1 relative">
+              <input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}
+                placeholder="To" className="input-base w-full pr-10 text-sm" min={0} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button type="button" onClick={onCancel}
+          className="flex-1 py-2 rounded-lg border border-border text-textSecondary hover:text-textPrimary transition-colors text-sm">
+          Cancel
+        </button>
+        <button type="submit" disabled={!name.trim()}
+          className="flex-1 py-2 rounded-lg bg-accent text-white hover:bg-accentLight transition-colors text-sm font-semibold disabled:opacity-40">
+          Save
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export default function BuyPage() {
   const [items, setItems] = useState<BuyItem[]>([]);
   const [name, setName] = useState("");
@@ -31,6 +128,7 @@ export default function BuyPage() {
   const [estimate, setEstimate] = useState("");
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -49,22 +147,19 @@ export default function BuyPage() {
       priceMax: isRange && priceMax !== "" ? Number(priceMax) : null,
       createdAt: now(),
     };
+    setItems((prev) => [...prev, item]);
+    setName(""); setEstimate(""); setPriceMin(""); setPriceMax("");
+    nameRef.current?.focus();
     await fetch("/api/buy-items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(item),
     });
-    setItems((prev) => [...prev, item]);
-    setName("");
-    setEstimate("");
-    setPriceMin("");
-    setPriceMax("");
-    nameRef.current?.focus();
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/buy-items/${id}`, { method: "DELETE" });
     setItems((prev) => prev.filter((i) => i.id !== id));
+    await fetch(`/api/buy-items/${id}`, { method: "DELETE" });
   }
 
   const hasAnyPrice = items.some(
@@ -84,7 +179,7 @@ export default function BuyPage() {
     <div className="max-w-2xl mx-auto px-8 py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-textPrimary">Things to buy</h1>
-        <p className="text-sm text-textMuted mt-1">Capture what you want to buy with a price estimate</p>
+        <p className="text-sm text-textMuted mt-1">Capture what you want to buy with an optional price estimate</p>
       </div>
 
       {/* Add form */}
@@ -103,42 +198,24 @@ export default function BuyPage() {
           {/* Price type toggle */}
           <div className="flex items-center gap-3">
             <div className="flex rounded-lg border border-border overflow-hidden text-sm shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsRange(false)}
-                className={`px-4 py-2 transition-colors ${
-                  !isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"
-                }`}
-              >
+              <button type="button" onClick={() => setIsRange(false)}
+                className={`px-4 py-2 transition-colors ${!isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"}`}>
                 Estimate
               </button>
-              <button
-                type="button"
-                onClick={() => setIsRange(true)}
-                className={`px-4 py-2 transition-colors ${
-                  isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"
-                }`}
-              >
+              <button type="button" onClick={() => setIsRange(true)}
+                className={`px-4 py-2 transition-colors ${isRange ? "bg-accent text-white font-semibold" : "text-textSecondary hover:text-textPrimary"}`}>
                 Range
               </button>
             </div>
-            <span className="text-xs text-textMuted">
-              {isRange ? "Set a low and high end" : "Your best guess"}
-            </span>
+            <span className="text-xs text-textMuted">Leave blank if unknown</span>
           </div>
 
           {/* Price input(s) */}
           <div className="flex gap-3 items-end">
             {!isRange ? (
               <div className="flex-1 relative">
-                <input
-                  type="number"
-                  value={estimate}
-                  onChange={(e) => setEstimate(e.target.value)}
-                  placeholder="0"
-                  className="input-base w-full pr-10"
-                  min={0}
-                />
+                <input type="number" value={estimate} onChange={(e) => setEstimate(e.target.value)}
+                  placeholder="0" className="input-base w-full pr-10" min={0} />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
               </div>
             ) : (
@@ -146,14 +223,8 @@ export default function BuyPage() {
                 <div className="flex-1">
                   <label className="text-xs text-textMuted mb-1.5 block">From</label>
                   <div className="relative">
-                    <input
-                      type="number"
-                      value={priceMin}
-                      onChange={(e) => setPriceMin(e.target.value)}
-                      placeholder="0"
-                      className="input-base w-full pr-10"
-                      min={0}
-                    />
+                    <input type="number" value={priceMin} onChange={(e) => setPriceMin(e.target.value)}
+                      placeholder="0" className="input-base w-full pr-10" min={0} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
                   </div>
                 </div>
@@ -161,24 +232,15 @@ export default function BuyPage() {
                 <div className="flex-1">
                   <label className="text-xs text-textMuted mb-1.5 block">To</label>
                   <div className="relative">
-                    <input
-                      type="number"
-                      value={priceMax}
-                      onChange={(e) => setPriceMax(e.target.value)}
-                      placeholder="0"
-                      className="input-base w-full pr-10"
-                      min={0}
-                    />
+                    <input type="number" value={priceMax} onChange={(e) => setPriceMax(e.target.value)}
+                      placeholder="0" className="input-base w-full pr-10" min={0} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-textMuted pointer-events-none">kr</span>
                   </div>
                 </div>
               </>
             )}
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="px-5 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accentLight transition-colors disabled:opacity-40 shrink-0"
-            >
+            <button type="submit" disabled={!name.trim()}
+              className="px-5 py-2.5 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accentLight transition-colors disabled:opacity-40 shrink-0">
               Add
             </button>
           </div>
@@ -196,21 +258,38 @@ export default function BuyPage() {
         <>
           <div className="space-y-2 mb-6">
             {items.map((item) => {
+              if (editingId === item.id) {
+                return (
+                  <EditRow
+                    key={item.id}
+                    item={item}
+                    onSave={(updated) => {
+                      setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
+                      setEditingId(null);
+                    }}
+                    onCancel={() => setEditingId(null)}
+                  />
+                );
+              }
               const price = formatPrice(item);
               return (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-4 bg-surface rounded-xl border border-border px-5 py-4 group"
-                >
+                <div key={item.id}
+                  className="flex items-center gap-4 bg-surface rounded-xl border border-border px-5 py-4 group">
                   <div className="flex-1 min-w-0">
                     <p className="text-base text-textPrimary font-medium">{item.name}</p>
-                    {price && <p className="text-sm text-textMuted mt-0.5">{price}</p>}
+                    {price
+                      ? <p className="text-sm text-textMuted mt-0.5">{price}</p>
+                      : <p className="text-xs text-textMuted/50 mt-0.5 italic">no estimate</p>
+                    }
                   </div>
-                  <button
-                    onClick={() => handleDelete(item.id)}
+                  <button onClick={() => setEditingId(item.id)}
+                    className="text-textMuted hover:text-textSecondary transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
+                    title="Edit">
+                    ✎
+                  </button>
+                  <button onClick={() => handleDelete(item.id)}
                     className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
-                    title="Remove"
-                  >
+                    title="Remove">
                     ✕
                   </button>
                 </div>

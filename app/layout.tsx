@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import StoreProvider from "@/components/StoreProvider";
+import ThemeProvider from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "Planlegger",
@@ -12,12 +13,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="bg-background text-textPrimary h-screen overflow-hidden flex">
-        <StoreProvider>
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto h-screen">
-            {children}
-          </main>
-        </StoreProvider>
+        <ThemeProvider>
+          <StoreProvider>
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto h-screen">
+              {children}
+            </main>
+          </StoreProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

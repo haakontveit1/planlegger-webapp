@@ -3,13 +3,14 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
 import Checkbox from "@/components/Checkbox";
-import DurationPicker from "@/components/DurationPicker";
 import DateNav from "@/components/DateNav";
 import { SortableList } from "@/components/SortableList";
 import { Task } from "@/lib/db";
 
+const DURATION_QUICK = [15, 30, 60, 90, 120, 180];
+
 // ── Inline add-task form ──────────────────────────────────────────────────────
-function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
+function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: () => void }) {
   const addTask = useStore((s) => s.addTask);
   const addRoutine = useStore((s) => s.addRoutine);
   const routines = useStore((s) => s.routines);
@@ -17,7 +18,7 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
 
   const [title, setTitle] = useState("");
   const [isBacklog, setIsBacklog] = useState(false);
-  const [duration, setDuration] = useState(30);
+  const [durationStr, setDurationStr] = useState("30");
   const [hasDuration, setHasDuration] = useState(true);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -32,32 +33,34 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
 
   function applySuggestion(r: typeof routines[0]) {
     setTitle(r.title);
-    if (r.defaultDurationMinutes) { setHasDuration(true); setDuration(r.defaultDurationMinutes); }
+    if (r.defaultDurationMinutes) { setHasDuration(true); setDurationStr(String(r.defaultDurationMinutes)); }
     if (r.projectId) setProjectId(r.projectId);
     setShowSuggestions(false);
     inputRef.current?.focus();
   }
 
+  const durationMinutes = hasDuration ? Math.max(1, parseInt(durationStr) || 1) : null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    await addTask({
+    addTask({
       title: trimmed,
       notes: null,
       status: "pending",
       category: "private",
       lane: "afterwork",
       customer: null,
-      durationMinutes: hasDuration ? duration : null,
+      durationMinutes,
       isBacklog,
       projectId: projectId || null,
-      dueDate: isBacklog ? null : todayISO(),
+      dueDate: isBacklog ? null : targetDate,
       dueTime: null,
       completedAt: null,
     });
     if (isRecurring && !routines.find((r) => r.title.toLowerCase() === trimmed.toLowerCase())) {
-      await addRoutine({ title: trimmed, projectId: projectId || null, defaultDurationMinutes: hasDuration ? duration : null, description: null });
+      addRoutine({ title: trimmed, projectId: projectId || null, defaultDurationMinutes: durationMinutes, description: null });
     }
     setTitle("");
     setIsBacklog(false);
@@ -72,7 +75,10 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
     return acc;
   }, {});
 
-  const PRESETS = [15, 30, 60];
+  const isToday = targetDate === todayISO();
+  const dateLabel = isToday
+    ? "Today"
+    : new Date(targetDate + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
@@ -114,7 +120,7 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
                 ? "bg-accent border-accent text-white"
                 : "border-border text-textSecondary hover:border-textSecondary"
             }`}>
-            {backlog ? "Backlog" : "Today"}
+            {backlog ? "Backlog" : dateLabel}
           </button>
         ))}
       </div>
@@ -131,19 +137,25 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
           </button>
         </div>
         {hasDuration && (
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setDuration((d) => Math.max(5, d - 5))}
-              className="w-7 h-7 rounded border border-border text-textSecondary hover:text-textPrimary flex items-center justify-center text-sm transition-colors">−</button>
-            <span className="text-sm font-bold text-textPrimary flex-1 text-center">{formatDuration(duration)}</span>
-            <button type="button" onClick={() => setDuration((d) => Math.min(480, d + 5))}
-              className="w-7 h-7 rounded border border-border text-textSecondary hover:text-textPrimary flex items-center justify-center text-sm transition-colors">+</button>
-            <div className="flex gap-1">
-              {PRESETS.map((p) => (
-                <button key={p} type="button" onClick={() => setDuration(p)}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={durationStr}
+                onChange={(e) => setDurationStr(e.target.value)}
+                className="input-base text-sm text-center"
+                style={{ padding: "8px 10px" }}
+              />
+              <span className="text-sm text-textMuted shrink-0">min</span>
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {DURATION_QUICK.map((p) => (
+                <button key={p} type="button" onClick={() => setDurationStr(String(p))}
                   className={`text-xs px-2 py-1 rounded transition-colors ${
-                    duration === p ? "bg-accent/20 text-accent" : "text-textMuted hover:text-textSecondary"
+                    durationStr === String(p) ? "bg-accent/20 text-accent" : "text-textMuted hover:text-textSecondary"
                   }`}>
-                  {formatDuration(p)}
+                  {p < 60 ? `${p}m` : `${p / 60}h`}
                 </button>
               ))}
             </div>
@@ -173,7 +185,7 @@ function InlineAddForm({ onAdded }: { onAdded?: () => void }) {
         </button>
         <button type="submit" disabled={!title.trim()}
           className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-success hover:bg-teal-400 text-background transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          Add to {isBacklog ? "Backlog" : "Today"}
+          Add to {isBacklog ? "Backlog" : dateLabel}
         </button>
       </div>
     </form>
@@ -192,7 +204,6 @@ export default function PlannerPage() {
   const addBrainDump = useStore((s) => s.addBrainDump);
   const deleteTask = useStore((s) => s.deleteTask);
 
-  const [durationPrompt, setDurationPrompt] = useState<string | null>(null);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
   const [captureText, setCaptureText] = useState("");
 
@@ -231,16 +242,10 @@ export default function PlannerPage() {
     reorderTasks(newItems.map((t) => t.id));
   }
 
-  function handleMoveToToday(taskId: string) {
+  function handleMoveToDate(taskId: string) {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
-    if (task.durationMinutes == null) setDurationPrompt(taskId);
-    else moveToToday(taskId);
-  }
-
-  async function handleDurationConfirm(minutes: number) {
-    if (durationPrompt) await moveToToday(durationPrompt, minutes);
-    setDurationPrompt(null);
+    moveToToday(taskId, task.durationMinutes ?? undefined, selectedDate);
   }
 
   async function handleCapture(e: React.FormEvent) {
@@ -251,70 +256,79 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="mx-auto px-8 py-10 pb-20 max-w-6xl">
-
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="mb-6">
+      <div className="px-8 pt-8 pb-4 shrink-0 max-w-6xl mx-auto w-full">
         <h1 className="text-3xl font-bold text-textPrimary">Planner</h1>
       </div>
 
-      <div className="grid grid-cols-[1fr_320px] gap-8 items-start">
+      <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-8 pb-6 grid grid-cols-[1fr_320px] gap-8">
 
-        {/* ── Left: today's task list ── */}
-        <div>
-          <DateNav />
-
-          {total > 0 && (
-            <div className="flex items-center gap-3 mb-5">
-              <div className="flex-1 progress-track h-1.5">
-                <div className="progress-fill" style={{ width: `${pct}%`, background: "#3DDBD2" }} />
-              </div>
-              <span className="text-sm text-textMuted shrink-0">{done}/{total}</span>
-            </div>
-          )}
-
-          {displayTasks.length === 0 ? (
-            <div className="py-10 text-center">
-              <p className="text-textMuted">
-                {isToday ? "Nothing here yet" : "No tasks for this day"}
-              </p>
-            </div>
-          ) : (
-            <SortableList
-              items={displayTasks}
-              onReorder={handleReorder}
-              renderItem={(task) => (
-                <div className="task-row flex items-center gap-3 px-3 py-3 rounded-xl group">
-                  <Checkbox checked={task.status === "completed"} onChange={() => toggleTask(task.id)} size={18} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {getProjectColor(task.projectId) && (
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
-                      )}
-                      <span className={`text-base ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
-                        {task.title}
-                      </span>
-                    </div>
-                    {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate pl-4">{task.notes}</p>}
-                  </div>
-                  {task.durationMinutes != null && (
-                    <span className="text-sm text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
-                  )}
-                  <button onClick={() => moveToBacklog(task.id)}
-                    className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
-                    ← backlog
-                  </button>
-                  <button onClick={() => deleteTask(task.id)}
-                    className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
-                    ✕
-                  </button>
+        {/* ── Left: task list + brain dump ── */}
+        <div className="flex flex-col min-h-0">
+          {/* DateNav + progress (fixed at top of left column) */}
+          <div className="shrink-0">
+            <DateNav />
+            {total > 0 && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 progress-track h-1.5">
+                  <div className="progress-fill" style={{ width: `${pct}%`, background: "#3DDBD2" }} />
                 </div>
-              )}
-            />
-          )}
+                <span className="text-sm text-textMuted shrink-0">{done}/{total}</span>
+              </div>
+            )}
+          </div>
 
-          {/* Brain dump quick-capture */}
-          <div className="mt-8 pt-5 border-t border-border/40">
+          {/* Scrollable task list */}
+          <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+            {displayTasks.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-textMuted">
+                  {isToday ? "Nothing here yet" : "No tasks for this day"}
+                </p>
+              </div>
+            ) : (
+              <SortableList
+                items={displayTasks}
+                onReorder={handleReorder}
+                renderItem={(task) => (
+                  <div className="task-row flex items-center gap-3 px-3 py-3 rounded-xl group">
+                    <Checkbox checked={task.status === "completed"} onChange={() => toggleTask(task.id)} size={18} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {getProjectColor(task.projectId) && (
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
+                        )}
+                        <span className={`text-base ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate pl-4">{task.notes}</p>}
+                    </div>
+                    {task.durationMinutes != null && (
+                      <span className="text-sm text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
+                    )}
+                    <button onClick={() => moveToBacklog(task.id)}
+                      className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
+                      ← backlog
+                    </button>
+                    <button onClick={() => deleteTask(task.id)}
+                      className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
+                      ✕
+                    </button>
+                  </div>
+                )}
+              />
+            )}
+          </div>
+
+          {/* Brain dump — pinned at bottom of left column */}
+          <div className="shrink-0 pt-4 border-t border-border/40 mt-2">
+            {minutesLeft > 0 && (
+              <p className="text-xs text-textMuted mb-3">
+                <span className="text-textPrimary font-semibold">{formatDuration(minutesLeft)}</span> remaining
+              </p>
+            )}
             <form onSubmit={handleCapture} className="flex gap-2">
               <input
                 type="text"
@@ -328,19 +342,18 @@ export default function PlannerPage() {
                 disabled={!captureText.trim()}
                 className="px-4 py-2.5 rounded-xl bg-surfaceElevated border border-border text-textSecondary hover:text-textPrimary disabled:opacity-40 transition-colors text-sm font-medium shrink-0"
               >
-                Capture ✎
+                ✎
               </button>
             </form>
-            <p className="text-xs text-textMuted mt-2">Saved to Brain Dump</p>
           </div>
         </div>
 
         {/* ── Right: add form + backlog ── */}
-        <div className="space-y-6">
+        <div className="overflow-y-auto space-y-6 pb-4">
           {/* Add form */}
           <div className="bg-surface rounded-xl border border-border p-5">
             <h2 className="section-label mb-4">New task</h2>
-            <InlineAddForm />
+            <InlineAddForm targetDate={selectedDate} />
           </div>
 
           {/* Backlog */}
@@ -351,7 +364,7 @@ export default function PlannerPage() {
             {backlogTasks.length === 0 ? (
               <p className="text-sm text-textMuted py-4 text-center">Backlog is empty</p>
             ) : (
-              <div className="space-y-1 max-h-[50vh] overflow-y-auto">
+              <div className="space-y-1">
                 {backlogTasks.map((task) => (
                   <div key={task.id} className="task-row flex items-center gap-2 px-2 py-2.5 rounded-lg group">
                     <div className="flex-1 min-w-0">
@@ -361,7 +374,7 @@ export default function PlannerPage() {
                     {task.durationMinutes != null && (
                       <span className="text-xs text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
                     )}
-                    <button onClick={() => handleMoveToToday(task.id)}
+                    <button onClick={() => handleMoveToDate(task.id)}
                       className="text-xs text-accent hover:text-accentLight font-medium transition-colors px-2 py-1 rounded hover:bg-accent/10 shrink-0">
                       → {isToday ? "today" : "this day"}
                     </button>
@@ -376,19 +389,6 @@ export default function PlannerPage() {
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      {minutesLeft > 0 && (
-        <div className="fixed bottom-0 left-60 right-0 bg-surface/90 backdrop-blur-sm border-t border-border px-8 py-3">
-          <p className="text-sm text-textMuted">
-            <span className="text-textPrimary font-semibold">{formatDuration(minutesLeft)}</span> remaining
-          </p>
-        </div>
-      )}
-
-      {durationPrompt && (
-        <DurationPicker title="How long?" onConfirm={handleDurationConfirm} onCancel={() => setDurationPrompt(null)} />
-      )}
     </div>
   );
 }

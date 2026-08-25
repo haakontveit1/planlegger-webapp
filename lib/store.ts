@@ -20,7 +20,7 @@ interface AppState {
   addTask: (t: Omit<Task, "id" | "createdAt" | "updatedAt" | "sortOrder">) => Promise<Task>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
-  moveToToday: (id: string, durationMinutes?: number) => Promise<void>;
+  moveToToday: (id: string, durationMinutes?: number, targetDate?: string) => Promise<void>;
   moveToBacklog: (id: string) => Promise<void>;
   updateTaskDuration: (id: string, durationMinutes: number | null) => Promise<void>;
   reorderTasks: (orderedIds: string[]) => Promise<void>;
@@ -111,8 +111,8 @@ export const useStore = create<AppState>((set, get) => ({
 
   addTask: async (partial) => {
     const task: Task = { ...partial, sortOrder: Date.now(), id: newId(), createdAt: now(), updatedAt: now() };
-    await jsonPost("/api/tasks", task);
     set((s) => ({ tasks: [...s.tasks, task] }));
+    jsonPost("/api/tasks", task).catch(console.error);
     return task;
   },
 
@@ -131,13 +131,13 @@ export const useStore = create<AppState>((set, get) => ({
     await apiFetch(`/api/tasks/${id}`, { method: "DELETE" });
   },
 
-  moveToToday: async (id, durationMinutes) => {
+  moveToToday: async (id, durationMinutes, targetDate) => {
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
-    const updated = { ...task, isBacklog: false, dueDate: todayISO(), updatedAt: now(),
+    const updated = { ...task, isBacklog: false, dueDate: targetDate ?? todayISO(), updatedAt: now(),
       ...(durationMinutes !== undefined ? { durationMinutes } : {}) };
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
-    await jsonPatch(`/api/tasks/${id}`, updated);
+    jsonPatch(`/api/tasks/${id}`, updated).catch(console.error);
   },
 
   moveToBacklog: async (id) => {
