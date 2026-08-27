@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
@@ -8,24 +8,20 @@ import NewTaskModal from "@/components/NewTaskModal";
 import { SortableList } from "@/components/SortableList";
 import { Task } from "@/lib/db";
 
-interface ProjectNote {
-  id: string;
-  projectId: string;
-  text: string;
-  createdAt: string;
-}
-
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const projects = useStore((s) => s.projects);
   const tasks = useStore((s) => s.tasks);
+  const allNotes = useStore((s) => s.projectNotes);
   const toggleTask = useStore((s) => s.toggleTask);
   const reorderTasks = useStore((s) => s.reorderTasks);
+  const addProjectNote = useStore((s) => s.addProjectNote);
+  const deleteProjectNote = useStore((s) => s.deleteProjectNote);
   const [showModal, setShowModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
 
-  const [notes, setNotes] = useState<ProjectNote[]>([]);
+  const notes = allNotes.filter((n) => n.projectId === id);
   const [noteInput, setNoteInput] = useState("");
   const [hoveredNote, setHoveredNote] = useState<string | null>(null);
   const noteInputRef = useRef<HTMLInputElement>(null);
@@ -46,34 +42,15 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const backlogTasks = pendingTasks.filter((t) => t.isBacklog || !t.dueDate);
   const otherTasks = pendingTasks.filter((t) => !t.isBacklog && t.dueDate && t.dueDate !== today);
 
-  useEffect(() => {
-    fetch(`/api/project-notes?projectId=${id}`)
-      .then((r) => r.json())
-      .then((data) => setNotes(Array.isArray(data) ? data : []))
-      .catch(() => {});
-  }, [id]);
-
   async function addNote() {
     const text = noteInput.trim();
     if (!text) return;
-    const note: ProjectNote = {
-      id: crypto.randomUUID(),
-      projectId: id,
-      text,
-      createdAt: new Date().toISOString(),
-    };
-    setNotes((prev) => [...prev, note]);
     setNoteInput("");
-    await fetch("/api/project-notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(note),
-    });
+    await addProjectNote({ id: crypto.randomUUID(), projectId: id, text, createdAt: new Date().toISOString() });
   }
 
   async function deleteNote(noteId: string) {
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-    await fetch(`/api/project-notes/${noteId}`, { method: "DELETE" });
+    await deleteProjectNote(noteId);
   }
 
   function handleReorder(newItems: Task[]) {

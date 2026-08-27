@@ -206,6 +206,7 @@ export default function PlannerPage() {
 
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
   const [captureText, setCaptureText] = useState("");
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
 
   const today = todayISO();
   const isToday = selectedDate === today;
@@ -240,6 +241,17 @@ export default function PlannerPage() {
   function handleReorder(newItems: Task[]) {
     setLocalOrder(newItems);
     reorderTasks(newItems.map((t) => t.id));
+  }
+
+  function handleToggle(taskId: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task?.status === "pending") {
+      setCompletingIds((prev) => new Set([...prev, taskId]));
+      setTimeout(() => {
+        setCompletingIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
+      }, 700);
+    }
+    toggleTask(taskId);
   }
 
   function handleMoveToDate(taskId: string) {
@@ -292,8 +304,8 @@ export default function PlannerPage() {
                 items={displayTasks}
                 onReorder={handleReorder}
                 renderItem={(task) => (
-                  <div className="task-row flex items-center gap-3 px-3 py-3 rounded-xl group">
-                    <Checkbox checked={task.status === "completed"} onChange={() => toggleTask(task.id)} size={18} />
+                  <div className={`task-row flex items-center gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
+                    <Checkbox checked={task.status === "completed"} onChange={() => handleToggle(task.id)} size={18} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         {getProjectColor(task.projectId) && (

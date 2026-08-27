@@ -1,8 +1,8 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { Project } from "@/lib/db";
+import { Project, ProjectNote } from "@/lib/db";
 import { newId, now } from "@/lib/utils";
 
 const PROJECT_COLORS = [
@@ -62,60 +62,50 @@ function NewProjectForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-function QuickNoteModal({ project, onClose }: { project: Project; onClose: () => void }) {
+function InlineNoteForm({ project, onClose }: { project: Project; onClose: () => void }) {
+  const addProjectNote = useStore((s) => s.addProjectNote);
   const [text, setText] = useState("");
   const [saved, setSaved] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed) return;
-    const note = { id: newId(), projectId: project.id, text: trimmed, createdAt: now() };
-    await fetch("/api/project-notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(note),
-    });
+    const note: ProjectNote = { id: newId(), projectId: project.id, text: trimmed, createdAt: now() };
+    await addProjectNote(note);
     setText("");
     setSaved(true);
-    setTimeout(() => { setSaved(false); inputRef.current?.focus(); }, 1200);
+    setTimeout(() => { setSaved(false); inputRef.current?.focus(); }, 1500);
   }
 
   return (
-    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-surfaceElevated rounded-xl w-full max-w-sm mx-4 shadow-2xl animate-pop-in p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: project.color }} />
-          <h3 className="text-base font-semibold text-textPrimary">{project.name}</h3>
-        </div>
-        <form onSubmit={submit} className="space-y-3">
-          <input
-            ref={inputRef}
-            type="text"
-            value={text}
-            onChange={(e) => { setText(e.target.value); setSaved(false); }}
-            placeholder="Note or thought..."
-            className="input-base"
-            autoFocus
-          />
-          <div className="flex gap-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-lg border border-border text-textSecondary hover:text-textPrimary transition-colors text-sm">
-              Close
-            </button>
-            <button type="submit" disabled={!text.trim()}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-40 ${
-                saved ? "bg-success text-background" : "bg-accent hover:bg-accentLight text-white"
-              }`}>
-              {saved ? "✓ Saved" : "Add note"}
-            </button>
-          </div>
-        </form>
-        <p className="text-xs text-textMuted mt-3 text-center">
-          Open the project to read notes
-        </p>
-      </div>
+    <div className="mt-1 bg-surfaceElevated rounded-b-xl border border-t-0 border-border px-4 py-3">
+      <form onSubmit={submit} className="flex gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={text}
+          onChange={(e) => { setText(e.target.value); setSaved(false); }}
+          onKeyDown={(e) => e.key === "Escape" && onClose()}
+          placeholder="Add a note..."
+          className="input-base flex-1 text-sm"
+          style={{ padding: "8px 12px" }}
+        />
+        <button type="submit" disabled={!text.trim()}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors shrink-0 disabled:opacity-40 ${
+            saved ? "bg-success/20 text-success" : "bg-accent/15 text-accent hover:bg-accent/25"
+          }`}>
+          {saved ? "✓ Saved" : "Add"}
+        </button>
+        <button type="button" onClick={onClose}
+          className="text-textMuted hover:text-textPrimary transition-colors px-2 py-2 rounded hover:bg-white/5 shrink-0 text-sm">
+          ✕
+        </button>
+      </form>
+      <p className="text-xs text-textMuted mt-2">Open the project to read notes · Esc to close</p>
     </div>
   );
 }
@@ -125,7 +115,7 @@ export default function ProjectsPage() {
   const tasks = useStore((s) => s.tasks);
   const deleteProject = useStore((s) => s.deleteProject);
   const [showForm, setShowForm] = useState(false);
-  const [noteProject, setNoteProject] = useState<Project | null>(null);
+  const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
 
   const byCategory = projects.reduce<Record<string, Project[]>>((acc, p) => {
     if (!acc[p.category]) acc[p.category] = [];
@@ -167,13 +157,14 @@ export default function ProjectsPage() {
           {Object.entries(byCategory).map(([category, projs]) => (
             <div key={category}>
               <h2 className="section-label mb-4">{category}</h2>
-              <div className="grid gap-3">
+              <div className="grid gap-1">
                 {projs.map((project) => {
                   const pending = taskCountForProject(project.id);
+                  const noteOpen = expandedNoteId === project.id;
                   return (
                     <div key={project.id} className="relative group">
                       <Link href={`/projects/${project.id}`}
-                        className="block bg-surface rounded-xl border border-border px-6 py-5 flex items-center gap-4 hover:border-opacity-60 transition-colors"
+                        className={`block bg-surface border border-border px-6 py-5 flex items-center gap-4 hover:border-opacity-60 transition-colors ${noteOpen ? "rounded-t-xl" : "rounded-xl"}`}
                         style={{ borderLeft: `5px solid ${project.color}` }}>
                         <div className="flex-1 min-w-0">
                           <p className="text-lg font-semibold text-textPrimary">{project.name}</p>
@@ -181,13 +172,15 @@ export default function ProjectsPage() {
                             {pending > 0 ? `${pending} pending task${pending !== 1 ? "s" : ""}` : "No open tasks"}
                           </p>
                         </div>
-                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-1">›</span>
+                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-8">›</span>
                       </Link>
-                      {/* Action buttons overlay */}
+                      {/* Action buttons */}
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={(e) => { e.preventDefault(); setNoteProject(project); }}
-                          className="text-textMuted hover:text-textSecondary transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5"
+                          onClick={(e) => { e.preventDefault(); setExpandedNoteId(noteOpen ? null : project.id); }}
+                          className={`transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5 ${
+                            noteOpen ? "text-accent" : "text-textMuted hover:text-textSecondary"
+                          }`}
                           title="Add note"
                         >
                           ✎
@@ -205,6 +198,10 @@ export default function ProjectsPage() {
                           ✕
                         </button>
                       </div>
+                      {/* Inline note form */}
+                      {noteOpen && (
+                        <InlineNoteForm project={project} onClose={() => setExpandedNoteId(null)} />
+                      )}
                     </div>
                   );
                 })}
@@ -212,10 +209,6 @@ export default function ProjectsPage() {
             </div>
           ))}
         </div>
-      )}
-
-      {noteProject && (
-        <QuickNoteModal project={noteProject} onClose={() => setNoteProject(null)} />
       )}
     </div>
   );

@@ -1,16 +1,8 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import { useStore } from "@/lib/store";
+import { BuyItem } from "@/lib/db";
 import { newId, now } from "@/lib/utils";
-
-interface BuyItem {
-  id: string;
-  name: string;
-  isRange: boolean;
-  priceEstimate: number | null;
-  priceMin: number | null;
-  priceMax: number | null;
-  createdAt: string;
-}
 
 function formatPrice(item: BuyItem): string | null {
   if (item.isRange && (item.priceMin !== null || item.priceMax !== null)) {
@@ -24,19 +16,12 @@ function formatPrice(item: BuyItem): string | null {
   return null;
 }
 
-async function patchItem(id: string, patch: Partial<BuyItem>) {
-  await fetch(`/api/buy-items/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-}
-
 function EditRow({ item, onSave, onCancel }: {
   item: BuyItem;
   onSave: (updated: BuyItem) => void;
   onCancel: () => void;
 }) {
+  const patchBuyItem = useStore((s) => s.patchBuyItem);
   const [name, setName] = useState(item.name);
   const [isRange, setIsRange] = useState(item.isRange);
   const [estimate, setEstimate] = useState(item.priceEstimate != null ? String(item.priceEstimate) : "");
@@ -44,7 +29,7 @@ function EditRow({ item, onSave, onCancel }: {
   const [priceMax, setPriceMax] = useState(item.priceMax != null ? String(item.priceMax) : "");
   const nameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { nameRef.current?.focus(); }, []);
+  useState(() => { nameRef.current?.focus(); });
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +42,7 @@ function EditRow({ item, onSave, onCancel }: {
       priceMin: isRange && priceMin !== "" ? Number(priceMin) : null,
       priceMax: isRange && priceMax !== "" ? Number(priceMax) : null,
     };
-    await patchItem(item.id, updated);
+    await patchBuyItem(item.id, updated);
     onSave(updated);
   }
 
@@ -70,6 +55,7 @@ function EditRow({ item, onSave, onCancel }: {
         onChange={(e) => setName(e.target.value)}
         placeholder="Item name"
         className="input-base text-sm"
+        autoFocus
       />
       <div className="flex items-center gap-3">
         <div className="flex rounded-lg border border-border overflow-hidden text-sm shrink-0">
@@ -122,7 +108,9 @@ function EditRow({ item, onSave, onCancel }: {
 }
 
 export default function BuyPage() {
-  const [items, setItems] = useState<BuyItem[]>([]);
+  const items = useStore((s) => s.buyItems);
+  const addBuyItem = useStore((s) => s.addBuyItem);
+  const deleteBuyItem = useStore((s) => s.deleteBuyItem);
   const [name, setName] = useState("");
   const [isRange, setIsRange] = useState(false);
   const [estimate, setEstimate] = useState("");
@@ -131,11 +119,7 @@ export default function BuyPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetch("/api/buy-items").then((r) => r.json()).then(setItems);
-  }, []);
-
-  async function handleAdd(e: React.FormEvent) {
+  function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     const item: BuyItem = {
@@ -147,19 +131,9 @@ export default function BuyPage() {
       priceMax: isRange && priceMax !== "" ? Number(priceMax) : null,
       createdAt: now(),
     };
-    setItems((prev) => [...prev, item]);
+    addBuyItem(item);
     setName(""); setEstimate(""); setPriceMin(""); setPriceMax("");
     nameRef.current?.focus();
-    await fetch("/api/buy-items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(item),
-    });
-  }
-
-  async function handleDelete(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    await fetch(`/api/buy-items/${id}`, { method: "DELETE" });
   }
 
   const hasAnyPrice = items.some(
@@ -195,7 +169,6 @@ export default function BuyPage() {
             autoFocus
           />
 
-          {/* Price type toggle */}
           <div className="flex items-center gap-3">
             <div className="flex rounded-lg border border-border overflow-hidden text-sm shrink-0">
               <button type="button" onClick={() => setIsRange(false)}
@@ -210,7 +183,6 @@ export default function BuyPage() {
             <span className="text-xs text-textMuted">Leave blank if unknown</span>
           </div>
 
-          {/* Price input(s) */}
           <div className="flex gap-3 items-end">
             {!isRange ? (
               <div className="flex-1 relative">
@@ -263,10 +235,7 @@ export default function BuyPage() {
                   <EditRow
                     key={item.id}
                     item={item}
-                    onSave={(updated) => {
-                      setItems((prev) => prev.map((i) => (i.id === item.id ? updated : i)));
-                      setEditingId(null);
-                    }}
+                    onSave={() => setEditingId(null)}
                     onCancel={() => setEditingId(null)}
                   />
                 );
@@ -287,7 +256,7 @@ export default function BuyPage() {
                     title="Edit">
                     ✎
                   </button>
-                  <button onClick={() => handleDelete(item.id)}
+                  <button onClick={() => deleteBuyItem(item.id)}
                     className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
                     title="Remove">
                     ✕
@@ -297,7 +266,6 @@ export default function BuyPage() {
             })}
           </div>
 
-          {/* Total estimate */}
           {hasAnyPrice && totalMin > 0 && (
             <div className="bg-surfaceElevated rounded-xl border border-border px-5 py-4">
               <p className="text-xs text-textMuted mb-1">Estimated total</p>

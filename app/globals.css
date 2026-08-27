@@ -47,6 +47,15 @@ html, body {
 }
 .check-pop { animation: check-pop 200ms ease-out; }
 
+/* Task completion flash */
+@keyframes task-complete {
+  0%   { background-color: transparent; transform: scale(1); }
+  20%  { background-color: rgba(61, 219, 210, 0.2); transform: scale(1.012); }
+  60%  { background-color: rgba(61, 219, 210, 0.08); transform: scale(1); }
+  100% { background-color: transparent; }
+}
+.task-completing { animation: task-complete 700ms ease-out forwards; }
+
 /* Progress bar */
 .progress-track {
   background: var(--color-border);

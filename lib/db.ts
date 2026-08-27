@@ -100,3 +100,20 @@ export interface WeeklyReview {
   reflection: string;
   completedAt: string;
 }
+
+export interface BuyItem {
+  id: string;
+  name: string;
+  isRange: boolean;
+  priceEstimate: number | null;
+  priceMin: number | null;
+  priceMax: number | null;
+  createdAt: string;
+}
+
+export interface ProjectNote {
+  id: string;
+  projectId: string;
+  text: string;
+  createdAt: string;
+}

@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import { Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession } from "./db";
+import { Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession, BuyItem, ProjectNote } from "./db";
 import { todayISO, weekStartISO, now, newId } from "./utils";
 
 interface AppState {
@@ -11,11 +11,20 @@ interface AppState {
   brainDumpItems: BrainDumpItem[];
   journalEntry: JournalEntry | null;
   devGoal: DevGoal | null;
+  buyItems: BuyItem[];
+  projectNotes: ProjectNote[];
   soundEnabled: boolean;
   selectedDate: string;
 
   setSelectedDate: (date: string) => void;
   loadAll: () => Promise<void>;
+
+  addBuyItem: (item: BuyItem) => void;
+  deleteBuyItem: (id: string) => Promise<void>;
+  patchBuyItem: (id: string, updated: BuyItem) => Promise<void>;
+
+  addProjectNote: (note: ProjectNote) => Promise<void>;
+  deleteProjectNote: (id: string) => Promise<void>;
 
   addTask: (t: Omit<Task, "id" | "createdAt" | "updatedAt" | "sortOrder">) => Promise<Task>;
   toggleTask: (id: string) => Promise<void>;
@@ -83,6 +92,8 @@ export const useStore = create<AppState>((set, get) => ({
   routines: [],
   routineSessions: [],
   brainDumpItems: [],
+  buyItems: [],
+  projectNotes: [],
   journalEntry: null,
   devGoal: null,
   soundEnabled: true,
@@ -95,7 +106,7 @@ export const useStore = create<AppState>((set, get) => ({
     const weekStart = weekStartISO();
     const safeJson = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const safeArr = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
-    const [tasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal] =
+    const [rawTasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal, buyItems, projectNotes] =
       await Promise.all([
         safeArr(fetch("/api/tasks")),
         safeArr(fetch("/api/projects")),
@@ -104,9 +115,27 @@ export const useStore = create<AppState>((set, get) => ({
         safeArr(fetch("/api/brain-dump")),
         safeJson(fetch(`/api/journal/${today}`)),
         safeJson(fetch(`/api/dev-goals/${weekStart}`)),
+        safeArr(fetch("/api/buy-items")),
+        safeArr(fetch("/api/project-notes")),
       ]);
+
+    // Auto-move overdue non-backlog incomplete tasks to backlog
+    const overdue = (rawTasks as Task[]).filter(
+      (t) => t.dueDate && t.dueDate < today && !t.isBacklog && t.status !== "completed"
+    );
+    const tasks: Task[] = overdue.length > 0
+      ? (rawTasks as Task[]).map((t) =>
+          overdue.find((o) => o.id === t.id) ? { ...t, isBacklog: true, dueDate: null } : t
+        )
+      : rawTasks;
+    if (overdue.length > 0) {
+      overdue.forEach((t) =>
+        jsonPatch(`/api/tasks/${t.id}`, { ...t, isBacklog: true, dueDate: null }).catch(console.error)
+      );
+    }
+
     set({ tasks, projects, routines, routineSessions, brainDumpItems,
-          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null });
+          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null, buyItems, projectNotes });
   },
 
   addTask: async (partial) => {
@@ -277,6 +306,35 @@ export const useStore = create<AppState>((set, get) => ({
       : { id: newId(), weekStart, targetHours: hours, loggedMinutes: 0 };
     await jsonPut(`/api/dev-goals/${weekStart}`, goal);
     set({ devGoal: goal });
+  },
+
+  addBuyItem: (item) => {
+    set((s) => ({ buyItems: [...s.buyItems, item] }));
+    jsonPost("/api/buy-items", item).catch(console.error);
+  },
+
+  deleteBuyItem: async (id) => {
+    set((s) => ({ buyItems: s.buyItems.filter((i) => i.id !== id) }));
+    await apiFetch(`/api/buy-items/${id}`, { method: "DELETE" });
+  },
+
+  patchBuyItem: async (id, updated) => {
+    set((s) => ({ buyItems: s.buyItems.map((i) => (i.id === id ? updated : i)) }));
+    await apiFetch(`/api/buy-items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updated),
+    });
+  },
+
+  addProjectNote: async (note) => {
+    set((s) => ({ projectNotes: [...s.projectNotes, note] }));
+    await jsonPost("/api/project-notes", note);
+  },
+
+  deleteProjectNote: async (id) => {
+    set((s) => ({ projectNotes: s.projectNotes.filter((n) => n.id !== id) }));
+    await apiFetch(`/api/project-notes/${id}`, { method: "DELETE" });
   },
 
   toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),
