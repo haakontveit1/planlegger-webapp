@@ -246,7 +246,7 @@ export default function PlannerPage() {
   function handleToggle(taskId: string) {
     const task = tasks.find((t) => t.id === taskId);
     if (task?.status === "pending") {
-      setCompletingIds((prev) => new Set([...prev, taskId]));
+      setCompletingIds((prev) => new Set(Array.from(prev).concat(taskId)));
       setTimeout(() => {
         setCompletingIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
       }, 700);
