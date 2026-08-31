@@ -1,0 +1,203 @@
+"use client";
+import { useState, useEffect } from "react";
+import { useStore } from "@/lib/store";
+import { todayISO, formatDuration } from "@/lib/utils";
+
+function tomorrowISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
+function formatDate(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+}
+
+const SCORE_LABELS: Record<number, string> = {
+  1: "Rough day",
+  2: "Below average",
+  3: "Decent",
+  4: "Good day",
+  5: "Great day",
+};
+
+export default function EndOfDayPage() {
+  const tasks = useStore((s) => s.tasks);
+  const journalEntry = useStore((s) => s.journalEntry);
+  const saveJournal = useStore((s) => s.saveJournal);
+  const addTask = useStore((s) => s.addTask);
+  const moveToToday = useStore((s) => s.moveToToday);
+
+  const today = todayISO();
+  const tomorrow = tomorrowISO();
+
+  const [score, setScore] = useState(0);
+  const [reflection, setReflection] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+
+  useEffect(() => {
+    if (journalEntry?.date === today) {
+      setScore(journalEntry.rating ?? 0);
+      setReflection(journalEntry.ratingNote ?? "");
+    }
+  }, [journalEntry, today]);
+
+  async function handleSave() {
+    await saveJournal({
+      date: today,
+      rating: score,
+      ratingNote: reflection.trim() || null,
+      bedTime: journalEntry?.bedTime ?? null,
+      wakeTime: journalEntry?.wakeTime ?? null,
+      learning: journalEntry?.learning ?? null,
+      tomorrow: journalEntry?.tomorrow ?? null,
+      photoUris: journalEntry?.photoUris ?? [],
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function handleAddTomorrow(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) return;
+    await addTask({
+      title: newTaskTitle.trim(),
+      notes: null,
+      status: "pending",
+      category: "private",
+      lane: "afterwork",
+      customer: null,
+      durationMinutes: null,
+      isBacklog: false,
+      projectId: null,
+      dueDate: tomorrow,
+      dueTime: null,
+      completedAt: null,
+    });
+    setNewTaskTitle("");
+  }
+
+  const backlogTasks = tasks.filter((t) => t.isBacklog && t.lane === "afterwork");
+  const tomorrowTasks = tasks.filter((t) => t.dueDate === tomorrow && !t.isBacklog);
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 md:px-8 py-6 md:py-10 space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold text-textPrimary">End of Day</h1>
+        <p className="text-sm text-textMuted mt-1">{formatDate(today)}</p>
+      </div>
+
+      {/* Day score */}
+      <section className="bg-surface rounded-xl border border-border p-6">
+        <h2 className="section-label mb-5">How did today go?</h2>
+        <div className="flex gap-2 mb-3">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              onClick={() => setScore(n)}
+              className={`flex-1 py-3 rounded-xl text-lg font-bold transition-all border-2 ${
+                score === n
+                  ? "border-accent bg-accent/20 text-accent scale-105"
+                  : "border-border text-textMuted hover:border-textMuted"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        {score > 0 && (
+          <p className="text-sm text-accent text-center mb-4 font-medium">{SCORE_LABELS[score]}</p>
+        )}
+        <textarea
+          value={reflection}
+          onChange={(e) => { setReflection(e.target.value); setSaved(false); }}
+          placeholder="Anything that stood out today? (optional)"
+          rows={3}
+          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
+        />
+        <button
+          onClick={handleSave}
+          disabled={score === 0}
+          className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-40 ${
+            saved
+              ? "bg-success/20 text-success"
+              : "bg-accent/15 text-accent hover:bg-accent/25"
+          }`}
+        >
+          {saved ? "✓ Saved" : "Save"}
+        </button>
+      </section>
+
+      {/* Plan ahead */}
+      <section>
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="section-label">Plan for tomorrow</h2>
+          <p className="text-xs text-textMuted">{formatDate(tomorrow)}</p>
+        </div>
+
+        {/* Already scheduled for tomorrow */}
+        {tomorrowTasks.length > 0 && (
+          <div className="space-y-1 mb-4">
+            {tomorrowTasks.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3 bg-surface rounded-xl border border-border">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
+                <span className="flex-1 text-sm text-textPrimary">{t.title}</span>
+                {t.durationMinutes != null && (
+                  <span className="text-xs text-textMuted">{formatDuration(t.durationMinutes)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new task for tomorrow */}
+        <form onSubmit={handleAddTomorrow} className="flex gap-2 mb-6">
+          <input
+            type="text"
+            value={newTaskTitle}
+            onChange={(e) => setNewTaskTitle(e.target.value)}
+            placeholder="Add a task for tomorrow..."
+            className="input-base flex-1 min-w-0 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={!newTaskTitle.trim()}
+            className="px-4 py-2 rounded-xl bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-sm font-semibold disabled:opacity-40 shrink-0"
+          >
+            Add
+          </button>
+        </form>
+
+        {/* Move from backlog */}
+        {backlogTasks.length > 0 && (
+          <>
+            <h3 className="section-label mb-3">From backlog</h3>
+            <div className="space-y-1">
+              {backlogTasks.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3 bg-surface rounded-xl border border-border">
+                  <span className="flex-1 text-sm text-textSecondary min-w-0 truncate">{t.title}</span>
+                  {t.durationMinutes != null && (
+                    <span className="text-xs text-textMuted shrink-0">{formatDuration(t.durationMinutes)}</span>
+                  )}
+                  <button
+                    onClick={() => moveToToday(t.id, t.durationMinutes ?? undefined, tomorrow)}
+                    className="text-xs text-accent hover:text-accentLight font-medium px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 transition-colors shrink-0"
+                  >
+                    → tomorrow
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {backlogTasks.length === 0 && tomorrowTasks.length === 0 && (
+          <p className="text-sm text-textMuted text-center py-6">Backlog is empty — add tasks above to plan tomorrow</p>
+        )}
+      </section>
+    </div>
+  );
+}

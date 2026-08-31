@@ -8,7 +8,7 @@ const mainItems = [
   { href: "/braindump",  label: "Brain Dump", icon: "✎" },
   { href: "/projects",   label: "Projects",   icon: "◈" },
   { href: "/buy",        label: "Buy",        icon: "◎" },
-  { href: "/growth",     label: "Growth",     icon: "↑" },
+  { href: "/end-of-day", label: "End of Day",  icon: "◑" },
 ];
 
 const wipItems = [

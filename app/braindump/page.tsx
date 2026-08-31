@@ -10,7 +10,7 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
   const updateBrainDumpNotes = useStore((s) => s.updateBrainDumpNotes);
 
   const [sortOpen, setSortOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(item.notes ?? "");
   const [notesDirty, setNotesDirty] = useState(false);
   const notesRef = useRef<HTMLTextAreaElement>(null);
@@ -24,10 +24,11 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
   async function saveNotes() {
     await updateBrainDumpNotes(item.id, notes);
     setNotesDirty(false);
+    setEditingNotes(false);
   }
 
   function openNotes() {
-    setNotesOpen(true);
+    setEditingNotes(true);
     setTimeout(() => notesRef.current?.focus(), 50);
   }
 
@@ -38,20 +39,18 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
         <span className="text-textMuted cursor-grab select-none text-lg shrink-0">≡</span>
         <span className="text-base text-textPrimary flex-1">{item.text}</span>
         <div className="flex items-center gap-1 shrink-0">
-          {!notesOpen && (
+          {!item.notes && !editingNotes && (
             <button
               onClick={openNotes}
               className="text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded hover:bg-accent/10"
             >
-              {item.notes ? "▸ notes" : "+ notes"}
+              + note
             </button>
           )}
           <button
             onClick={() => setSortOpen((v) => !v)}
             className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-              sortOpen
-                ? "bg-accent text-white"
-                : "text-accent hover:bg-accent/10"
+              sortOpen ? "bg-accent text-white" : "text-accent hover:bg-accent/10"
             }`}
           >
             sort →
@@ -66,33 +65,48 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
         </div>
       </div>
 
-      {/* Inline notes */}
-      {notesOpen && (
+      {/* Note — always visible as a comment block when it exists */}
+      {item.notes && !editingNotes && (
+        <div className="px-5 pb-4">
+          <div
+            onClick={openNotes}
+            className="flex items-start gap-3 bg-surfaceElevated rounded-xl px-4 py-3 border border-border/60 cursor-pointer hover:border-accent/40 transition-colors group"
+          >
+            <span className="text-textMuted/40 text-lg leading-none shrink-0 mt-0.5">└</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-textSecondary whitespace-pre-wrap">{item.notes}</p>
+            </div>
+            <span className="text-xs text-textMuted/40 group-hover:text-textMuted transition-colors shrink-0">edit</span>
+          </div>
+        </div>
+      )}
+
+      {/* Note editor */}
+      {editingNotes && (
         <div className="px-5 pb-4 border-t border-border/50 pt-3">
           <textarea
             ref={notesRef}
             value={notes}
             onChange={(e) => { setNotes(e.target.value); setNotesDirty(true); }}
-            onBlur={() => { if (notesDirty) saveNotes(); }}
-            placeholder="Add notes, details, links..."
+            placeholder="Add a note..."
             rows={3}
-            className="w-full bg-surfaceElevated border border-border rounded-lg px-4 py-3 text-sm text-textPrimary placeholder-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
+            className="w-full bg-surfaceElevated border border-border rounded-xl px-4 py-3 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
+            autoFocus
           />
           <div className="flex items-center justify-between mt-2">
             <button
-              onClick={() => { setNotesOpen(false); setNotes(item.notes ?? ""); setNotesDirty(false); }}
+              onClick={() => { setEditingNotes(false); setNotes(item.notes ?? ""); setNotesDirty(false); }}
               className="text-xs text-textMuted hover:text-textSecondary transition-colors"
             >
-              {item.notes ? "collapse" : "cancel"}
+              cancel
             </button>
-            {notesDirty && (
-              <button
-                onClick={saveNotes}
-                className="text-xs bg-accent/20 text-accent px-3 py-1 rounded-full hover:bg-accent/30 transition-colors font-medium"
-              >
-                Save notes
-              </button>
-            )}
+            <button
+              onClick={saveNotes}
+              disabled={!notesDirty}
+              className="text-xs bg-accent/20 text-accent px-3 py-1 rounded-full hover:bg-accent/30 transition-colors font-medium disabled:opacity-40"
+            >
+              Save
+            </button>
           </div>
         </div>
       )}

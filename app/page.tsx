@@ -204,9 +204,13 @@ export default function PlannerPage() {
   const addBrainDump = useStore((s) => s.addBrainDump);
   const deleteTask = useStore((s) => s.deleteTask);
 
+  const updateTask = useStore((s) => s.updateTask);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
   const [captureText, setCaptureText] = useState("");
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDur, setEditDur] = useState("");
 
   const today = todayISO();
   const isToday = selectedDate === today;
@@ -303,33 +307,79 @@ export default function PlannerPage() {
               <SortableList
                 items={displayTasks}
                 onReorder={handleReorder}
-                renderItem={(task) => (
-                  <div className={`task-row flex items-center gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
-                    <Checkbox checked={task.status === "completed"} onChange={() => handleToggle(task.id)} size={18} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        {getProjectColor(task.projectId) && (
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
-                        )}
-                        <span className={`text-base ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
-                          {task.title}
-                        </span>
+                renderItem={(task) => {
+                  if (editingId === task.id) {
+                    return (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!editTitle.trim()) return;
+                          await updateTask(task.id, {
+                            title: editTitle.trim(),
+                            durationMinutes: editDur !== "" ? Number(editDur) : null,
+                          });
+                          setEditingId(null);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surfaceElevated border border-accent/30"
+                      >
+                        <input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="flex-1 min-w-0 bg-transparent text-sm text-textPrimary focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
+                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <input
+                            type="number"
+                            value={editDur}
+                            onChange={(e) => setEditDur(e.target.value)}
+                            placeholder="–"
+                            className="w-12 bg-background border border-border rounded px-2 py-1 text-xs text-textPrimary focus:outline-none focus:border-accent text-center"
+                            min={1}
+                          />
+                          <span className="text-xs text-textMuted">m</span>
+                        </div>
+                        <button type="submit" className="text-accent text-sm px-2 py-1 rounded hover:bg-accent/10 transition-colors">✓</button>
+                        <button type="button" onClick={() => setEditingId(null)} className="text-textMuted text-sm px-2 py-1 rounded hover:bg-white/5 transition-colors">✕</button>
+                      </form>
+                    );
+                  }
+                  return (
+                    <div className={`task-row flex items-center gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
+                      <Checkbox checked={task.status === "completed"} onChange={() => handleToggle(task.id)} size={18} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {getProjectColor(task.projectId) && (
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
+                          )}
+                          <span className={`text-base ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
+                            {task.title}
+                          </span>
+                        </div>
+                        {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate pl-4">{task.notes}</p>}
                       </div>
-                      {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate pl-4">{task.notes}</p>}
+                      {task.durationMinutes != null && (
+                        <span className="text-sm text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
+                      )}
+                      <button
+                        onClick={() => { setEditingId(task.id); setEditTitle(task.title); setEditDur(task.durationMinutes != null ? String(task.durationMinutes) : ""); }}
+                        className="text-textMuted hover:text-textSecondary transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
+                        title="Edit"
+                      >
+                        ✎
+                      </button>
+                      <button onClick={() => moveToBacklog(task.id)}
+                        className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
+                        ← backlog
+                      </button>
+                      <button onClick={() => deleteTask(task.id)}
+                        className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
+                        ✕
+                      </button>
                     </div>
-                    {task.durationMinutes != null && (
-                      <span className="text-sm text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
-                    )}
-                    <button onClick={() => moveToBacklog(task.id)}
-                      className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
-                      ← backlog
-                    </button>
-                    <button onClick={() => deleteTask(task.id)}
-                      className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
-                      ✕
-                    </button>
-                  </div>
-                )}
+                  );
+                }}
               />
             )}
           </div>

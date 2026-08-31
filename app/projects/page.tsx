@@ -172,7 +172,7 @@ export default function ProjectsPage() {
                             {pending > 0 ? `${pending} pending task${pending !== 1 ? "s" : ""}` : "No open tasks"}
                           </p>
                         </div>
-                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-20 md:mr-8">›</span>
+                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-20">›</span>
                       </Link>
                       {/* Action buttons */}
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">

@@ -14,6 +14,7 @@ interface AppState {
   buyItems: BuyItem[];
   projectNotes: ProjectNote[];
   soundEnabled: boolean;
+  isLoaded: boolean;
   selectedDate: string;
 
   setSelectedDate: (date: string) => void;
@@ -33,6 +34,7 @@ interface AppState {
   moveToBacklog: (id: string) => Promise<void>;
   updateTaskDuration: (id: string, durationMinutes: number | null) => Promise<void>;
   reorderTasks: (orderedIds: string[]) => Promise<void>;
+  updateTask: (id: string, updates: Partial<Pick<Task, "title" | "durationMinutes" | "notes">>) => Promise<void>;
 
   addProject: (p: Omit<Project, "id" | "createdAt" | "updatedAt">) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
@@ -97,6 +99,7 @@ export const useStore = create<AppState>((set, get) => ({
   journalEntry: null,
   devGoal: null,
   soundEnabled: true,
+  isLoaded: false,
   selectedDate: todayISO(),
 
   setSelectedDate: (date) => set({ selectedDate: date }),
@@ -135,7 +138,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     set({ tasks, projects, routines, routineSessions, brainDumpItems,
-          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null, buyItems, projectNotes });
+          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null, buyItems, projectNotes, isLoaded: true });
   },
 
   addTask: async (partial) => {
@@ -181,6 +184,14 @@ export const useStore = create<AppState>((set, get) => ({
     const task = get().tasks.find((t) => t.id === id);
     if (!task) return;
     const updated = { ...task, durationMinutes, updatedAt: now() };
+    set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
+    await jsonPatch(`/api/tasks/${id}`, updated);
+  },
+
+  updateTask: async (id, updates) => {
+    const task = get().tasks.find((t) => t.id === id);
+    if (!task) return;
+    const updated = { ...task, ...updates, updatedAt: now() };
     set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? updated : t)) }));
     await jsonPatch(`/api/tasks/${id}`, updated);
   },
