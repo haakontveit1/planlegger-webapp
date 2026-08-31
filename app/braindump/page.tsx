@@ -147,7 +147,7 @@ export default function BrainDumpPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-10">
+    <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
       <h1 className="text-3xl font-bold text-textPrimary mb-1">Brain dump</h1>
       <p className="text-sm text-textMuted mb-8">
         Empty your head. No lane, no date — sort it later, or never.

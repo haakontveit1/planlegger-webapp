@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import StoreProvider from "@/components/StoreProvider";
@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   description: "Personal task planner",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -16,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <StoreProvider>
             <Sidebar />
-            <main className="flex-1 overflow-y-auto h-screen">
+            <main className="flex-1 overflow-y-auto h-screen pt-14 md:pt-0">
               {children}
             </main>
           </StoreProvider>

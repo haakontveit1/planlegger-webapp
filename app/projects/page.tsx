@@ -128,7 +128,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-10">
+    <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-textPrimary">Projects</h1>

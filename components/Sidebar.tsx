@@ -85,21 +85,22 @@ export default function Sidebar() {
         <SidebarNav />
       </aside>
 
-      {/* Mobile hamburger button — only when drawer is closed */}
-      {!mobileOpen && (
+      {/* Mobile header bar — always visible on mobile */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
         <button
           onClick={() => setMobileOpen(true)}
-          className="md:hidden fixed top-4 left-4 z-40 w-10 h-10 flex items-center justify-center bg-surface border border-border rounded-lg text-textPrimary shadow-lg text-lg leading-none"
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-textPrimary hover:bg-white/5 transition-colors text-xl leading-none"
           aria-label="Open menu"
         >
           ☰
         </button>
-      )}
+        <span className="text-base font-bold text-textPrimary tracking-tight">Planlegger</span>
+      </div>
 
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <aside className="w-60 h-screen bg-surface border-r border-border flex flex-col shrink-0">
+          <aside className="w-64 h-screen bg-surface border-r border-border flex flex-col shrink-0">
             <div className="px-6 py-6 border-b border-border flex items-center justify-between">
               <span className="text-xl font-bold text-textPrimary tracking-tight">Planlegger</span>
               <button

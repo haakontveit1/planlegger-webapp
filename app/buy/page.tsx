@@ -150,7 +150,7 @@ export default function BuyPage() {
   const hasRange = items.some((i) => i.isRange && i.priceMin !== null && i.priceMax !== null);
 
   return (
-    <div className="max-w-2xl mx-auto px-8 py-10">
+    <div className="max-w-2xl mx-auto px-4 md:px-8 py-6 md:py-10">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-textPrimary">Things to buy</h1>
         <p className="text-sm text-textMuted mt-1">Capture what you want to buy with an optional price estimate</p>

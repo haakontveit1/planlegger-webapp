@@ -71,7 +71,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
   if (!project) {
     return (
-      <div className="max-w-4xl mx-auto px-8 py-10">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
         <Link href="/projects" className="text-sm text-accent hover:text-accentLight transition-colors">← Projects</Link>
         <p className="mt-8 text-textMuted">Project not found.</p>
       </div>
@@ -106,7 +106,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-10">
+    <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10">
       {/* Back */}
       <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm text-textMuted hover:text-textPrimary transition-colors mb-6">
         ← Projects

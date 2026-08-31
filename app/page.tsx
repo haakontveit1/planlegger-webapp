@@ -268,16 +268,16 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col md:h-full">
       {/* Header */}
-      <div className="px-8 pt-8 pb-4 shrink-0 max-w-6xl mx-auto w-full">
+      <div className="px-4 md:px-8 pt-6 md:pt-8 pb-4 shrink-0 max-w-6xl mx-auto w-full">
         <h1 className="text-3xl font-bold text-textPrimary">Planner</h1>
       </div>
 
-      <div className="flex-1 min-h-0 max-w-6xl mx-auto w-full px-8 pb-6 grid grid-cols-[1fr_320px] gap-8">
+      <div className="md:flex-1 md:min-h-0 max-w-6xl mx-auto w-full px-4 md:px-8 pb-6 grid grid-cols-1 md:grid-cols-[1fr_320px] gap-8">
 
         {/* ── Left: task list + brain dump ── */}
-        <div className="flex flex-col min-h-0">
+        <div className="flex flex-col md:min-h-0">
           {/* DateNav + progress (fixed at top of left column) */}
           <div className="shrink-0">
             <DateNav />
@@ -292,7 +292,7 @@ export default function PlannerPage() {
           </div>
 
           {/* Scrollable task list */}
-          <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+          <div className="md:flex-1 md:overflow-y-auto md:min-h-0 pr-1">
             {displayTasks.length === 0 ? (
               <div className="py-10 text-center">
                 <p className="text-textMuted">
@@ -361,7 +361,7 @@ export default function PlannerPage() {
         </div>
 
         {/* ── Right: add form + backlog ── */}
-        <div className="overflow-y-auto space-y-6 pb-4">
+        <div className="md:overflow-y-auto space-y-6 pb-4">
           {/* Add form */}
           <div className="bg-surface rounded-xl border border-border p-5">
             <h2 className="section-label mb-4">New task</h2>
