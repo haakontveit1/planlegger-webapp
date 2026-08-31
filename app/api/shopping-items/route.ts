@@ -25,3 +25,8 @@ export async function POST(req: Request) {
   `;
   return NextResponse.json(item, { status: 201 });
 }
+
+export async function DELETE() {
+  await sql`DELETE FROM shopping_items WHERE checked = 1`;
+  return NextResponse.json({ ok: true });
+}

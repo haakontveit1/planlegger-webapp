@@ -121,6 +121,16 @@ export const useStore = create<AppState>((set, get) => ({
     const weekStart = weekStartISO();
     const safeJson = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const safeArr = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
+
+    // Reset checked shopping items once per day
+    try {
+      const lastReset = localStorage.getItem("shopping_reset_date");
+      if (lastReset !== today) {
+        await fetch("/api/shopping-items", { method: "DELETE" });
+        localStorage.setItem("shopping_reset_date", today);
+      }
+    } catch {}
+
     const [rawTasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal, buyItems, projectNotes, brainDumpNotes, shoppingItems] =
       await Promise.all([
         safeArr(fetch("/api/tasks")),
