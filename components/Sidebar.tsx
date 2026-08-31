@@ -85,8 +85,8 @@ export default function Sidebar() {
         <SidebarNav />
       </aside>
 
-      {/* Mobile header bar — always visible on mobile */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
+      {/* Mobile header — static in document flow (not fixed) */}
+      <div className="md:hidden h-14 bg-surface border-b border-border flex items-center px-4 gap-3 shrink-0">
         <button
           onClick={() => setMobileOpen(true)}
           className="w-9 h-9 flex items-center justify-center rounded-lg text-textPrimary hover:bg-white/5 transition-colors text-xl leading-none"

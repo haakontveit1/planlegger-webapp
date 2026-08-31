@@ -164,7 +164,7 @@ export default function BrainDumpPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="What's on your mind?"
-              className="flex-1 bg-surfaceElevated border border-border rounded-lg px-4 py-2.5 text-base text-textPrimary placeholder-textMuted focus:outline-none focus:border-accent transition-colors"
+              className="flex-1 min-w-0 bg-surfaceElevated border border-border rounded-lg px-4 py-2.5 text-base text-textPrimary placeholder-textMuted focus:outline-none focus:border-accent transition-colors"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAdd(); }
               }}

@@ -17,11 +17,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-background text-textPrimary h-screen overflow-hidden flex">
+      <body className="bg-background text-textPrimary h-screen overflow-hidden flex flex-col md:flex-row">
         <ThemeProvider>
           <StoreProvider>
             <Sidebar />
-            <main className="flex-1 overflow-y-auto h-screen pt-14 md:pt-0">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden pb-24 md:pb-0">
               {children}
             </main>
           </StoreProvider>

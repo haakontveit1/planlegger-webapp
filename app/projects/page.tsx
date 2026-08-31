@@ -172,10 +172,10 @@ export default function ProjectsPage() {
                             {pending > 0 ? `${pending} pending task${pending !== 1 ? "s" : ""}` : "No open tasks"}
                           </p>
                         </div>
-                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-8">›</span>
+                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-20 md:mr-8">›</span>
                       </Link>
                       {/* Action buttons */}
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => { e.preventDefault(); setExpandedNoteId(noteOpen ? null : project.id); }}
                           className={`transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5 ${
