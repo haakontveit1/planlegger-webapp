@@ -27,9 +27,9 @@ export default function HandelistePage() {
       sortOrder: Date.now(),
       createdAt: now(),
     };
-    await addShoppingItem(item);
     setInput("");
     inputRef.current?.focus();
+    addShoppingItem(item);
   }
 
   return (

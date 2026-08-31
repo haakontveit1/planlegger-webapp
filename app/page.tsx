@@ -34,9 +34,8 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
     : routines.slice(0, 6);
 
   const showShoppingSuggestion =
-    title.trim().length === 0 ||
-    "handle på butikken".includes(title.toLowerCase()) ||
-    "handle".startsWith(title.toLowerCase().slice(0, 6));
+    title.trim().length >= 3 &&
+    "handle på butikken".includes(title.toLowerCase());
 
   const suggestions = showShoppingSuggestion
     ? [SHOPPING_TASK as (typeof routines[0] & { id: string }), ...routineSuggestions.filter((r) => r.title.toLowerCase() !== "handle på butikken")]
