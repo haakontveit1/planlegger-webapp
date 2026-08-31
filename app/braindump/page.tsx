@@ -1,19 +1,24 @@
 "use client";
 import { useState, useRef } from "react";
 import { useStore } from "@/lib/store";
+import { newId, now } from "@/lib/utils";
+import { BrainDumpNote } from "@/lib/db";
 
 type SortTarget = "afterwork" | "delete" | null;
 
 function BrainDumpItem({ item }: { item: { id: string; text: string; notes: string | null; createdAt: string } }) {
   const sortBrainDump = useStore((s) => s.sortBrainDump);
   const deleteBrainDump = useStore((s) => s.deleteBrainDump);
-  const updateBrainDumpNotes = useStore((s) => s.updateBrainDumpNotes);
+  const brainDumpNotes = useStore((s) => s.brainDumpNotes);
+  const addBrainDumpNote = useStore((s) => s.addBrainDumpNote);
+  const deleteBrainDumpNote = useStore((s) => s.deleteBrainDumpNote);
 
   const [sortOpen, setSortOpen] = useState(false);
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [notes, setNotes] = useState(item.notes ?? "");
-  const [notesDirty, setNotesDirty] = useState(false);
-  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const noteInputRef = useRef<HTMLInputElement>(null);
+
+  const notes = brainDumpNotes.filter((n) => n.brainDumpItemId === item.id);
 
   async function handleSort(target: SortTarget) {
     if (!target) return;
@@ -21,15 +26,23 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
     await sortBrainDump(item.id, target);
   }
 
-  async function saveNotes() {
-    await updateBrainDumpNotes(item.id, notes);
-    setNotesDirty(false);
-    setEditingNotes(false);
+  async function handleAddNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newNote.trim()) return;
+    const note: BrainDumpNote = {
+      id: newId(),
+      brainDumpItemId: item.id,
+      text: newNote.trim(),
+      createdAt: now(),
+    };
+    await addBrainDumpNote(note);
+    setNewNote("");
+    noteInputRef.current?.focus();
   }
 
-  function openNotes() {
-    setEditingNotes(true);
-    setTimeout(() => notesRef.current?.focus(), 50);
+  function toggleNotes() {
+    setNotesOpen((v) => !v);
+    if (!notesOpen) setTimeout(() => noteInputRef.current?.focus(), 50);
   }
 
   return (
@@ -39,14 +52,16 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
         <span className="text-textMuted cursor-grab select-none text-lg shrink-0">≡</span>
         <span className="text-base text-textPrimary flex-1">{item.text}</span>
         <div className="flex items-center gap-1 shrink-0">
-          {!item.notes && !editingNotes && (
-            <button
-              onClick={openNotes}
-              className="text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded hover:bg-accent/10"
-            >
-              + note
-            </button>
-          )}
+          <button
+            onClick={toggleNotes}
+            className={`text-xs px-2 py-1 rounded transition-colors ${
+              notesOpen ? "text-accent bg-accent/10" : "text-textMuted hover:text-accent hover:bg-accent/10"
+            }`}
+          >
+            {notes.length > 0
+              ? `${notes.length} note${notes.length !== 1 ? "s" : ""}`
+              : "+ note"}
+          </button>
           <button
             onClick={() => setSortOpen((v) => !v)}
             className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
@@ -65,49 +80,42 @@ function BrainDumpItem({ item }: { item: { id: string; text: string; notes: stri
         </div>
       </div>
 
-      {/* Note — always visible as a comment block when it exists */}
-      {item.notes && !editingNotes && (
-        <div className="px-5 pb-4">
-          <div
-            onClick={openNotes}
-            className="flex items-start gap-3 bg-surfaceElevated rounded-xl px-4 py-3 border border-border/60 cursor-pointer hover:border-accent/40 transition-colors group"
-          >
-            <span className="text-textMuted/40 text-lg leading-none shrink-0 mt-0.5">└</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-textSecondary whitespace-pre-wrap">{item.notes}</p>
+      {/* Notes section — hidden by default, expanded on click */}
+      {notesOpen && (
+        <div className="border-t border-border/50 px-5 py-3 space-y-2">
+          {notes.length === 0 && (
+            <p className="text-xs text-textMuted py-1">No notes yet — add one below</p>
+          )}
+          {notes.map((note) => (
+            <div key={note.id} className="flex items-start gap-2 group">
+              <div className="flex-1 bg-surfaceElevated rounded-xl px-4 py-2.5 border border-border/60">
+                <p className="text-sm text-textSecondary">{note.text}</p>
+              </div>
+              <button
+                onClick={() => deleteBrainDumpNote(note.id)}
+                className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-2 text-sm px-1"
+              >
+                ✕
+              </button>
             </div>
-            <span className="text-xs text-textMuted/40 group-hover:text-textMuted transition-colors shrink-0">edit</span>
-          </div>
-        </div>
-      )}
-
-      {/* Note editor */}
-      {editingNotes && (
-        <div className="px-5 pb-4 border-t border-border/50 pt-3">
-          <textarea
-            ref={notesRef}
-            value={notes}
-            onChange={(e) => { setNotes(e.target.value); setNotesDirty(true); }}
-            placeholder="Add a note..."
-            rows={3}
-            className="w-full bg-surfaceElevated border border-border rounded-xl px-4 py-3 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
-            autoFocus
-          />
-          <div className="flex items-center justify-between mt-2">
+          ))}
+          <form onSubmit={handleAddNote} className="flex gap-2 pt-1">
+            <input
+              ref={noteInputRef}
+              type="text"
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add a note..."
+              className="flex-1 min-w-0 bg-surfaceElevated border border-border rounded-xl px-3 py-2 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors"
+            />
             <button
-              onClick={() => { setEditingNotes(false); setNotes(item.notes ?? ""); setNotesDirty(false); }}
-              className="text-xs text-textMuted hover:text-textSecondary transition-colors"
+              type="submit"
+              disabled={!newNote.trim()}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-accent/15 text-accent hover:bg-accent/25 transition-colors disabled:opacity-40 shrink-0"
             >
-              cancel
+              Add
             </button>
-            <button
-              onClick={saveNotes}
-              disabled={!notesDirty}
-              className="text-xs bg-accent/20 text-accent px-3 py-1 rounded-full hover:bg-accent/30 transition-colors font-medium disabled:opacity-40"
-            >
-              Save
-            </button>
-          </div>
+          </form>
         </div>
       )}
 
@@ -146,8 +154,8 @@ export default function BrainDumpPage() {
   const addBrainDump = useStore((s) => s.addBrainDump);
 
   const [input, setInput] = useState("");
-  const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleAdd(e?: React.FormEvent) {
@@ -178,7 +186,7 @@ export default function BrainDumpPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="What's on your mind?"
-              className="flex-1 min-w-0 bg-surfaceElevated border border-border rounded-lg px-4 py-2.5 text-base text-textPrimary placeholder-textMuted focus:outline-none focus:border-accent transition-colors"
+              className="flex-1 min-w-0 bg-surfaceElevated border border-border rounded-lg px-4 py-2.5 text-base text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAdd(); }
               }}
@@ -192,7 +200,6 @@ export default function BrainDumpPage() {
             </button>
           </div>
 
-          {/* Toggle notes */}
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -210,7 +217,7 @@ export default function BrainDumpPage() {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="More details, links, context..."
               rows={3}
-              className="w-full mt-3 bg-surfaceElevated border border-border rounded-lg px-4 py-3 text-sm text-textPrimary placeholder-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
+              className="w-full mt-3 bg-surfaceElevated border border-border rounded-lg px-4 py-3 text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:border-accent transition-colors resize-none"
             />
           )}
         </form>
@@ -221,7 +228,7 @@ export default function BrainDumpPage() {
         <div className="text-center py-20 text-textMuted">
           <p className="text-4xl mb-4">🧠</p>
           <p className="text-xl mb-2">Nothing captured yet</p>
-          <p className="text-sm">Start typing above — sort it into a task when you're ready</p>
+          <p className="text-sm">Start typing above — sort it into a task when you&apos;re ready</p>
         </div>
       ) : (
         <>

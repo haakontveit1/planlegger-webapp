@@ -15,13 +15,14 @@ function formatDate(iso: string) {
   });
 }
 
-const SCORE_LABELS: Record<number, string> = {
-  1: "Rough day",
-  2: "Below average",
-  3: "Decent",
-  4: "Good day",
-  5: "Great day",
-};
+function scoreLabel(n: number) {
+  if (n === 0) return "";
+  if (n <= 20) return "Rough day";
+  if (n <= 40) return "Below average";
+  if (n <= 60) return "Decent";
+  if (n <= 80) return "Good day";
+  return "Great day";
+}
 
 export default function EndOfDayPage() {
   const tasks = useStore((s) => s.tasks);
@@ -93,24 +94,26 @@ export default function EndOfDayPage() {
       {/* Day score */}
       <section className="bg-surface rounded-xl border border-border p-6">
         <h2 className="section-label mb-5">How did today go?</h2>
-        <div className="flex gap-2 mb-3">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              onClick={() => setScore(n)}
-              className={`flex-1 py-3 rounded-xl text-lg font-bold transition-all border-2 ${
-                score === n
-                  ? "border-accent bg-accent/20 text-accent scale-105"
-                  : "border-border text-textMuted hover:border-textMuted"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
+        <div className="mb-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={score}
+            onChange={(e) => { setScore(Number(e.target.value)); setSaved(false); }}
+            className="range-slider w-full"
+          />
+          <div className="flex justify-between text-xs text-textMuted mt-1">
+            <span>0</span>
+            <span>100</span>
+          </div>
         </div>
-        {score > 0 && (
-          <p className="text-sm text-accent text-center mb-4 font-medium">{SCORE_LABELS[score]}</p>
-        )}
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <span className="text-4xl font-bold text-accent">{score}</span>
+          {score > 0 && (
+            <span className="text-sm text-accent font-medium">{scoreLabel(score)}</span>
+          )}
+        </div>
         <textarea
           value={reflection}
           onChange={(e) => { setReflection(e.target.value); setSaved(false); }}

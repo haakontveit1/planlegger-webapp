@@ -27,9 +27,20 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const suggestions = title.trim().length > 0
+  const SHOPPING_TASK = { id: "__shopping__", title: "Handle på butikken", defaultDurationMinutes: 60, projectId: null };
+
+  const routineSuggestions = title.trim().length > 0
     ? routines.filter((r) => r.title.toLowerCase().includes(title.toLowerCase()))
     : routines.slice(0, 6);
+
+  const showShoppingSuggestion =
+    title.trim().length === 0 ||
+    "handle på butikken".includes(title.toLowerCase()) ||
+    "handle".startsWith(title.toLowerCase().slice(0, 6));
+
+  const suggestions = showShoppingSuggestion
+    ? [SHOPPING_TASK as (typeof routines[0] & { id: string }), ...routineSuggestions.filter((r) => r.title.toLowerCase() !== "handle på butikken")]
+    : routineSuggestions;
 
   function applySuggestion(r: typeof routines[0]) {
     setTitle(r.title);
@@ -100,7 +111,7 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
             {suggestions.map((r) => (
               <button key={r.id} type="button" onMouseDown={() => applySuggestion(r)}
                 className="w-full px-3 py-2.5 text-left hover:bg-white/5 flex items-center gap-2 transition-colors">
-                <span className="text-accent text-xs shrink-0">⟳</span>
+                <span className="text-accent text-xs shrink-0">{r.id === "__shopping__" ? "🛒" : "⟳"}</span>
                 <span className="flex-1 text-textPrimary text-sm">{r.title}</span>
                 {r.defaultDurationMinutes && (
                   <span className="text-textMuted text-xs shrink-0">{formatDuration(r.defaultDurationMinutes)}</span>

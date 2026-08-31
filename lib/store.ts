@@ -1,6 +1,6 @@
 "use client";
 import { create } from "zustand";
-import { Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession, BuyItem, ProjectNote } from "./db";
+import { Task, BrainDumpItem, JournalEntry, DevGoal, Project, Routine, RoutineSession, BuyItem, ProjectNote, BrainDumpNote, ShoppingItem } from "./db";
 import { todayISO, weekStartISO, now, newId } from "./utils";
 
 interface AppState {
@@ -13,6 +13,8 @@ interface AppState {
   devGoal: DevGoal | null;
   buyItems: BuyItem[];
   projectNotes: ProjectNote[];
+  brainDumpNotes: BrainDumpNote[];
+  shoppingItems: ShoppingItem[];
   soundEnabled: boolean;
   isLoaded: boolean;
   selectedDate: string;
@@ -25,7 +27,15 @@ interface AppState {
   patchBuyItem: (id: string, updated: BuyItem) => Promise<void>;
 
   addProjectNote: (note: ProjectNote) => Promise<void>;
+  updateProjectNote: (id: string, text: string) => Promise<void>;
   deleteProjectNote: (id: string) => Promise<void>;
+
+  addBrainDumpNote: (note: BrainDumpNote) => Promise<void>;
+  deleteBrainDumpNote: (id: string) => Promise<void>;
+
+  addShoppingItem: (item: ShoppingItem) => Promise<void>;
+  toggleShoppingItem: (id: string) => Promise<void>;
+  deleteShoppingItem: (id: string) => Promise<void>;
 
   addTask: (t: Omit<Task, "id" | "createdAt" | "updatedAt" | "sortOrder">) => Promise<Task>;
   toggleTask: (id: string) => Promise<void>;
@@ -96,6 +106,8 @@ export const useStore = create<AppState>((set, get) => ({
   brainDumpItems: [],
   buyItems: [],
   projectNotes: [],
+  brainDumpNotes: [],
+  shoppingItems: [],
   journalEntry: null,
   devGoal: null,
   soundEnabled: true,
@@ -109,7 +121,7 @@ export const useStore = create<AppState>((set, get) => ({
     const weekStart = weekStartISO();
     const safeJson = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const safeArr = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
-    const [rawTasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal, buyItems, projectNotes] =
+    const [rawTasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal, buyItems, projectNotes, brainDumpNotes, shoppingItems] =
       await Promise.all([
         safeArr(fetch("/api/tasks")),
         safeArr(fetch("/api/projects")),
@@ -120,6 +132,8 @@ export const useStore = create<AppState>((set, get) => ({
         safeJson(fetch(`/api/dev-goals/${weekStart}`)),
         safeArr(fetch("/api/buy-items")),
         safeArr(fetch("/api/project-notes")),
+        safeArr(fetch("/api/brain-dump-notes")),
+        safeArr(fetch("/api/shopping-items")),
       ]);
 
     // Auto-move overdue non-backlog incomplete tasks to backlog
@@ -138,7 +152,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     set({ tasks, projects, routines, routineSessions, brainDumpItems,
-          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null, buyItems, projectNotes, isLoaded: true });
+          journalEntry: journalEntry ?? null, devGoal: devGoal ?? null, buyItems, projectNotes, brainDumpNotes, shoppingItems, isLoaded: true });
   },
 
   addTask: async (partial) => {
@@ -343,9 +357,53 @@ export const useStore = create<AppState>((set, get) => ({
     await jsonPost("/api/project-notes", note);
   },
 
+  updateProjectNote: async (id, text) => {
+    set((s) => ({ projectNotes: s.projectNotes.map((n) => n.id === id ? { ...n, text } : n) }));
+    await jsonPatch(`/api/project-notes/${id}`, { text });
+  },
+
   deleteProjectNote: async (id) => {
     set((s) => ({ projectNotes: s.projectNotes.filter((n) => n.id !== id) }));
     await apiFetch(`/api/project-notes/${id}`, { method: "DELETE" });
+  },
+
+  addBrainDumpNote: async (note) => {
+    set((s) => ({ brainDumpNotes: [...s.brainDumpNotes, note] }));
+    await jsonPost("/api/brain-dump-notes", note);
+  },
+
+  deleteBrainDumpNote: async (id) => {
+    set((s) => ({ brainDumpNotes: s.brainDumpNotes.filter((n) => n.id !== id) }));
+    await apiFetch(`/api/brain-dump-notes/${id}`, { method: "DELETE" });
+  },
+
+  addShoppingItem: async (item) => {
+    set((s) => ({ shoppingItems: [...s.shoppingItems, item] }));
+    await jsonPost("/api/shopping-items", item);
+  },
+
+  toggleShoppingItem: async (id) => {
+    const item = get().shoppingItems.find((i) => i.id === id);
+    if (!item) return;
+    const checked = !item.checked;
+    const updated = { ...item, checked };
+    set((s) => ({ shoppingItems: s.shoppingItems.map((i) => i.id === id ? updated : i) }));
+    await jsonPatch(`/api/shopping-items/${id}`, { checked });
+    // Auto-complete "Handle på butikken" task when all items are checked
+    if (checked) {
+      const allChecked = get().shoppingItems.every((i) => i.checked);
+      if (allChecked) {
+        const shoppingTask = get().tasks.find(
+          (t) => t.title.toLowerCase() === "handle på butikken" && t.status === "pending"
+        );
+        if (shoppingTask) get().toggleTask(shoppingTask.id);
+      }
+    }
+  },
+
+  deleteShoppingItem: async (id) => {
+    set((s) => ({ shoppingItems: s.shoppingItems.filter((i) => i.id !== id) }));
+    await apiFetch(`/api/shopping-items/${id}`, { method: "DELETE" });
   },
 
   toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),

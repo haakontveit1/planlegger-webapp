@@ -117,3 +117,18 @@ export interface ProjectNote {
   text: string;
   createdAt: string;
 }
+
+export interface BrainDumpNote {
+  id: string;
+  brainDumpItemId: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface ShoppingItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  sortOrder: number;
+  createdAt: string;
+}

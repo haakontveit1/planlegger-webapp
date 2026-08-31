@@ -8,6 +8,54 @@ import NewTaskModal from "@/components/NewTaskModal";
 import { SortableList } from "@/components/SortableList";
 import { Task } from "@/lib/db";
 
+function NoteRow({ note, onUpdate, onDelete, formatTime }: {
+  note: { id: string; text: string; createdAt: string };
+  onUpdate: (text: string) => void;
+  onDelete: () => void;
+  formatTime: (iso: string) => string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note.text);
+
+  function save() {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== note.text) onUpdate(trimmed);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="px-3 py-2.5 rounded-lg bg-surfaceElevated border border-accent/30">
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") setEditing(false); }}
+          rows={2}
+          className="w-full bg-transparent text-sm text-textPrimary focus:outline-none resize-none"
+          autoFocus
+        />
+        <div className="flex gap-2 mt-1">
+          <button onClick={save} className="text-xs text-accent hover:text-accentLight">Save</button>
+          <button onClick={() => { setDraft(note.text); setEditing(false); }} className="text-xs text-textMuted hover:text-textSecondary">Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surfaceElevated transition-colors group cursor-pointer" onClick={() => setEditing(true)}>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-textPrimary">{note.text}</p>
+        <p className="text-xs text-textMuted mt-0.5">{formatTime(note.createdAt)}</p>
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="text-xs text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5">
+        ✕
+      </button>
+    </div>
+  );
+}
+
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const projects = useStore((s) => s.projects);
@@ -16,6 +64,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const toggleTask = useStore((s) => s.toggleTask);
   const reorderTasks = useStore((s) => s.reorderTasks);
   const addProjectNote = useStore((s) => s.addProjectNote);
+  const updateProjectNote = useStore((s) => s.updateProjectNote);
   const deleteProjectNote = useStore((s) => s.deleteProjectNote);
   const [showModal, setShowModal] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -23,7 +72,6 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
 
   const notes = allNotes.filter((n) => n.projectId === id);
   const [noteInput, setNoteInput] = useState("");
-  const [hoveredNote, setHoveredNote] = useState<string | null>(null);
   const noteInputRef = useRef<HTMLInputElement>(null);
 
   const project = projects.find((p) => p.id === id);
@@ -240,25 +288,13 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           ) : (
             <div className="space-y-2">
               {notes.map((note) => (
-                <div
+                <NoteRow
                   key={note.id}
-                  className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-surfaceElevated transition-colors group"
-                  onMouseEnter={() => setHoveredNote(note.id)}
-                  onMouseLeave={() => setHoveredNote(null)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-textPrimary">{note.text}</p>
-                    <p className="text-xs text-textMuted mt-0.5">{formatNoteTime(note.createdAt)}</p>
-                  </div>
-                  {hoveredNote === note.id && (
-                    <button
-                      onClick={() => deleteNote(note.id)}
-                      className="text-xs text-textMuted hover:text-red-400 transition-colors shrink-0 mt-0.5"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+                  note={note}
+                  onUpdate={(text) => updateProjectNote(note.id, text)}
+                  onDelete={() => deleteNote(note.id)}
+                  formatTime={formatNoteTime}
+                />
               ))}
             </div>
           )}

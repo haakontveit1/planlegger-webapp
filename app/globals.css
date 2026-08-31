@@ -121,6 +121,21 @@ html, body {
   color: var(--color-text-muted);
 }
 
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
+
+/* Range slider */
+input[type=range] { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 9999px;
+  background: var(--color-border); outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%; background: #7B72FF; cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(123,114,255,0.2); transition: box-shadow 150ms; }
+input[type=range]::-webkit-slider-thumb:hover { box-shadow: 0 0 0 5px rgba(123,114,255,0.3); }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%;
+  background: #7B72FF; cursor: pointer; border: none; }
+
 /* Input base */
 .input-base {
   width: 100%;
