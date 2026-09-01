@@ -49,7 +49,7 @@ function NoteRow({ note, onUpdate, onDelete, formatTime }: {
         <p className="text-xs text-textMuted mt-0.5">{formatTime(note.createdAt)}</p>
       </div>
       <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        className="text-xs text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 mt-0.5">
+        className="text-sm text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 shrink-0 px-2 py-1 rounded hover:bg-red-400/10 -mr-1">
         ✕
       </button>
     </div>
