@@ -211,12 +211,10 @@ export default function PlannerPage() {
   const moveToBacklog = useStore((s) => s.moveToBacklog);
   const moveToToday = useStore((s) => s.moveToToday);
   const reorderTasks = useStore((s) => s.reorderTasks);
-  const addBrainDump = useStore((s) => s.addBrainDump);
   const deleteTask = useStore((s) => s.deleteTask);
 
   const updateTask = useStore((s) => s.updateTask);
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
-  const [captureText, setCaptureText] = useState("");
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -272,13 +270,6 @@ export default function PlannerPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
     moveToToday(taskId, task.durationMinutes ?? undefined, selectedDate);
-  }
-
-  async function handleCapture(e: React.FormEvent) {
-    e.preventDefault();
-    if (!captureText.trim()) return;
-    await addBrainDump(captureText.trim());
-    setCaptureText("");
   }
 
   return (
@@ -363,7 +354,7 @@ export default function PlannerPage() {
                           {getProjectColor(task.projectId) && (
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
                           )}
-                          <span className={`text-base ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
+                          <span className={`text-base truncate ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
                             {task.title}
                           </span>
                         </div>
@@ -380,7 +371,7 @@ export default function PlannerPage() {
                         ✎
                       </button>
                       <button onClick={() => moveToBacklog(task.id)}
-                        className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
+                        className="hidden md:block text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
                         ← backlog
                       </button>
                       <button onClick={() => deleteTask(task.id)}
@@ -394,30 +385,14 @@ export default function PlannerPage() {
             )}
           </div>
 
-          {/* Brain dump — pinned at bottom of left column */}
-          <div className="shrink-0 pt-4 border-t border-border/40 mt-2">
-            {minutesLeft > 0 && (
-              <p className="text-xs text-textMuted mb-3">
+          {/* Time remaining */}
+          {minutesLeft > 0 && (
+            <div className="shrink-0 pt-3 mt-1">
+              <p className="text-xs text-textMuted">
                 <span className="text-textPrimary font-semibold">{formatDuration(minutesLeft)}</span> remaining
               </p>
-            )}
-            <form onSubmit={handleCapture} className="flex gap-2">
-              <input
-                type="text"
-                value={captureText}
-                onChange={(e) => setCaptureText(e.target.value)}
-                placeholder="Quick thought? Capture it here..."
-                className="input-base flex-1 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!captureText.trim()}
-                className="px-4 py-2.5 rounded-xl bg-surfaceElevated border border-border text-textSecondary hover:text-textPrimary disabled:opacity-40 transition-colors text-sm font-medium shrink-0"
-              >
-                ✎
-              </button>
-            </form>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── Right: add form + backlog ── */}

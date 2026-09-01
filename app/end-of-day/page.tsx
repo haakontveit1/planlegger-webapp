@@ -3,6 +3,14 @@ import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
 
+function getLastResetTime() {
+  const now = new Date();
+  const reset = new Date(now);
+  reset.setHours(5, 0, 0, 0);
+  if (now < reset) reset.setDate(reset.getDate() - 1);
+  return reset;
+}
+
 function tomorrowISO() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -38,6 +46,7 @@ export default function EndOfDayPage() {
   const [reflection, setReflection] = useState("");
   const [saved, setSaved] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [weight, setWeight] = useState("");
 
   useEffect(() => {
     if (journalEntry?.date === today) {
@@ -45,6 +54,25 @@ export default function EndOfDayPage() {
       setReflection(journalEntry.ratingNote ?? "");
     }
   }, [journalEntry, today]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("weight_log");
+      if (stored) {
+        const { weight: w, savedAt } = JSON.parse(stored);
+        if (new Date(savedAt) >= getLastResetTime()) setWeight(w);
+        else localStorage.removeItem("weight_log");
+      }
+    } catch {}
+  }, []);
+
+  function handleWeightChange(val: string) {
+    setWeight(val);
+    try {
+      if (val.trim()) localStorage.setItem("weight_log", JSON.stringify({ weight: val, savedAt: new Date().toISOString() }));
+      else localStorage.removeItem("weight_log");
+    } catch {}
+  }
 
   async function handleSave() {
     await saveJournal({
@@ -87,9 +115,27 @@ export default function EndOfDayPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 md:px-8 py-6 md:py-10 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-textPrimary">End of Day</h1>
+        <h1 className="text-3xl font-bold text-textPrimary">Tracking</h1>
         <p className="text-sm text-textMuted mt-1">{formatDate(today)}</p>
       </div>
+
+      {/* Weight */}
+      <section className="bg-surface rounded-xl border border-border p-6">
+        <h2 className="section-label mb-4">Vekt</h2>
+        <div className="flex items-center gap-3">
+          <input
+            type="number"
+            step="0.1"
+            min={0}
+            value={weight}
+            onChange={(e) => handleWeightChange(e.target.value)}
+            placeholder="—"
+            className="input-base text-2xl font-bold text-center w-36"
+          />
+          <span className="text-lg text-textMuted font-medium">kg</span>
+          {weight && <span className="text-sm text-textMuted ml-2">Lagret ✓</span>}
+        </div>
+      </section>
 
       {/* Day score */}
       <section className="bg-surface rounded-xl border border-border p-6">

@@ -7,8 +7,9 @@ const mainItems = [
   { href: "/",            label: "Planner",     icon: "✦" },
   { href: "/braindump",   label: "Brain Dump",  icon: "✎" },
   { href: "/projects",    label: "Projects",    icon: "◈" },
+  { href: "/buy",         label: "Buy",         icon: "◎" },
   { href: "/handleliste", label: "Handleliste", icon: "◉" },
-  { href: "/end-of-day",  label: "End of Day",  icon: "◑" },
+  { href: "/end-of-day",  label: "Tracking",    icon: "◑" },
 ];
 
 const wipItems = [
