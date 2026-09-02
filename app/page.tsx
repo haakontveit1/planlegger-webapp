@@ -273,18 +273,18 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="flex flex-col md:h-full">
+    <div className="flex flex-col">
       {/* Header */}
-      <div className="w-[90%] max-w-[1100px] mx-auto pt-4 md:pt-8 pb-4 shrink-0">
+      <div className="w-[90%] max-w-[1100px] mx-auto pt-4 md:pt-8 pb-4">
         <h1 className="text-3xl font-bold text-textPrimary">Planner</h1>
       </div>
 
-      <div className="md:flex-1 md:min-h-0 w-[90%] max-w-[1100px] mx-auto pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
+      <div className="w-[90%] max-w-[1100px] mx-auto pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
 
-        {/* ── Left: task list + brain dump ── */}
-        <div className="flex flex-col md:min-h-0 min-w-0">
-          {/* DateNav + progress (fixed at top of left column) */}
-          <div className="shrink-0">
+        {/* ── Left: task list ── */}
+        <div className="flex flex-col min-w-0">
+          {/* DateNav + progress */}
+          <div>
             <DateNav />
             {total > 0 && (
               <div className="flex items-center gap-3 mb-4">
@@ -296,8 +296,8 @@ export default function PlannerPage() {
             )}
           </div>
 
-          {/* Scrollable task list */}
-          <div className="md:flex-1 md:overflow-y-auto md:min-h-0 pr-1">
+          {/* Task list */}
+          <div className="pr-1">
             {displayTasks.length === 0 ? (
               <div className="py-10 text-center">
                 <p className="text-textMuted">
@@ -387,7 +387,7 @@ export default function PlannerPage() {
 
           {/* Time remaining */}
           {minutesLeft > 0 && (
-            <div className="shrink-0 pt-3 mt-1">
+            <div className="pt-3 mt-1">
               <p className="text-xs text-textMuted">
                 <span className="text-textPrimary font-semibold">{formatDuration(minutesLeft)}</span> remaining
               </p>
@@ -395,8 +395,8 @@ export default function PlannerPage() {
           )}
         </div>
 
-        {/* ── Right: add form + backlog ── */}
-        <div className="md:overflow-y-auto space-y-6 pb-4">
+        {/* ── Right: add form + backlog — sticky so position never changes ── */}
+        <div className="md:sticky md:top-6 space-y-6 pb-4">
           {/* Add form */}
           <div className="bg-surface rounded-xl border border-border p-5">
             <h2 className="section-label mb-4">New task</h2>
