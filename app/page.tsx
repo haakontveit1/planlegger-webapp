@@ -275,11 +275,11 @@ export default function PlannerPage() {
   return (
     <div className="flex flex-col md:h-full">
       {/* Header */}
-      <div className="px-[5%] pt-4 md:pt-8 pb-4 shrink-0 w-full">
+      <div className="w-[90%] max-w-[1100px] mx-auto pt-4 md:pt-8 pb-4 shrink-0">
         <h1 className="text-3xl font-bold text-textPrimary">Planner</h1>
       </div>
 
-      <div className="md:flex-1 md:min-h-0 w-full px-[5%] pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
+      <div className="md:flex-1 md:min-h-0 w-[90%] max-w-[1100px] mx-auto pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
 
         {/* ── Left: task list + brain dump ── */}
         <div className="flex flex-col md:min-h-0">
