@@ -45,23 +45,28 @@ function EmptyChart({ message }: { message: string }) {
   );
 }
 
+async function loadGarminData(): Promise<GarminDay[]> {
+  const r = await fetch("/api/garmin/data");
+  return r.json();
+}
+
 export default function StatsPage() {
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [garminData, setGarminData] = useState<GarminDay[]>([]);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "done" | "error" | "no-creds">("idle");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [missingDays, setMissingDays] = useState<string[]>([]);
+  const [backfilling, setBackfilling] = useState(false);
 
   useEffect(() => {
-    // Load stored data
     fetch("/api/weight-logs").then(r => r.json()).then(setWeightLogs).catch(() => {});
-    fetch("/api/garmin/data").then(r => r.json()).then((data: GarminDay[]) => {
+    loadGarminData().then((data) => {
       setGarminData(data);
       if (data.length > 0) setLastSynced(data[0].date);
     }).catch(() => {});
 
-    // Trigger daily sync (guarded server-side to once per day)
     setSyncStatus("syncing");
-    fetch("/api/garmin/sync", { method: "POST" })
+    fetch("/api/garmin/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) })
       .then(r => r.json())
       .then((result) => {
         if (result.error === "GARMIN_EMAIL and GARMIN_PASSWORD not configured") {
@@ -70,9 +75,9 @@ export default function StatsPage() {
           setSyncStatus("error");
         } else {
           setSyncStatus("done");
-          // Reload garmin data if a new sync happened
+          if (Array.isArray(result.missingDays)) setMissingDays(result.missingDays);
           if (!result.cached) {
-            fetch("/api/garmin/data").then(r => r.json()).then((data: GarminDay[]) => {
+            loadGarminData().then((data) => {
               setGarminData(data);
               if (data.length > 0) setLastSynced(data[0].date);
             }).catch(() => {});
@@ -82,13 +87,31 @@ export default function StatsPage() {
       .catch(() => setSyncStatus("error"));
   }, []);
 
-  // ── Weight chart data (last 60 days, chronological) ──
+  async function handleBackfill() {
+    if (missingDays.length === 0 || backfilling) return;
+    setBackfilling(true);
+    try {
+      const res = await fetch("/api/garmin/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backfill: missingDays }),
+      });
+      const result = await res.json();
+      if (result.ok) {
+        setMissingDays([]);
+        const data = await loadGarminData();
+        setGarminData(data);
+        if (data.length > 0) setLastSynced(data[0].date);
+      }
+    } catch {}
+    setBackfilling(false);
+  }
+
   const weightChartData = [...weightLogs]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-60)
     .map(w => ({ date: fmtDate(w.date), weight: w.weightKg }));
 
-  // ── Garmin chart data (last 14 days, chronological) ──
   const garminChartData = [...garminData]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-14)
@@ -125,7 +148,7 @@ export default function StatsPage() {
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
               <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
               <YAxis domain={["auto", "auto"]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={40} unit=" kg" />
-              <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#F59E0B" }} formatter={(v: number) => [`${v} kg`, "Vekt"]} />
+              <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#F59E0B" }} formatter={(v) => [`${v} kg`, "Vekt"]} />
               <Line type="monotone" dataKey="weight" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3, fill: "#F59E0B" }} activeDot={{ r: 5 }} connectNulls />
             </LineChart>
           </ResponsiveContainer>
@@ -149,10 +172,31 @@ export default function StatsPage() {
               {syncStatus === "syncing" && "Synkroniserer med Garmin…"}
               {syncStatus === "done" && lastSynced && `Sist hentet: ${fmtDate(lastSynced)}`}
               {syncStatus === "error" && "Garmin sync feilet — sjekk påloggingsdetaljer"}
-              {syncStatus === "idle" && ""}
             </span>
             <span className="text-textMuted/50">Henter data én gang per dag</span>
           </div>
+
+          {/* Backfill notification */}
+          {missingDays.length > 0 && (
+            <div className="flex items-center justify-between gap-4 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-amber-400">
+                  {missingDays.length} dag{missingDays.length !== 1 ? "er" : ""} mangler Garmin-data
+                </p>
+                <p className="text-xs text-amber-400/70 mt-0.5">
+                  {fmtDate(missingDays[0])}
+                  {missingDays.length > 1 && ` – ${fmtDate(missingDays[missingDays.length - 1])}`}
+                </p>
+              </div>
+              <button
+                onClick={handleBackfill}
+                disabled={backfilling}
+                className="shrink-0 px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {backfilling ? "Henter…" : "Hent manglende"}
+              </button>
+            </div>
+          )}
 
           {/* Steps */}
           <section className="bg-surface rounded-xl border border-border p-6">
@@ -165,7 +209,7 @@ export default function StatsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
                   <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={45} />
-                  <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#3DDBD2" }} formatter={(v: number) => [v.toLocaleString("no-NO"), "Skritt"]} />
+                  <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#3DDBD2" }} formatter={(v) => [Number(v).toLocaleString("no-NO"), "Skritt"]} />
                   <ReferenceLine y={10000} stroke="rgba(255,255,255,0.15)" strokeDasharray="4 4" label={{ value: "10k", position: "right", fill: "#6b7280", fontSize: 10 }} />
                   <Bar dataKey="steps" fill="#3DDBD2" radius={[4, 4, 0, 0]} maxBarSize={40} />
                 </BarChart>
@@ -185,7 +229,7 @@ export default function StatsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
                     <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 10]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#818CF8" }} formatter={(v: number) => [`${v}t`, "Søvn"]} />
+                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#818CF8" }} formatter={(v) => [`${v}t`, "Søvn"]} />
                     <ReferenceLine y={8} stroke="rgba(255,255,255,0.15)" strokeDasharray="4 4" />
                     <Bar dataKey="sleepHours" fill="#818CF8" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
@@ -203,7 +247,7 @@ export default function StatsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
                     <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#6EE7B7" }} formatter={(v: number) => [v, "Score"]} />
+                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#6EE7B7" }} formatter={(v) => [v, "Score"]} />
                     <Line type="monotone" dataKey="sleepScore" stroke="#6EE7B7" strokeWidth={2} dot={{ r: 3, fill: "#6EE7B7" }} activeDot={{ r: 5 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
@@ -223,7 +267,7 @@ export default function StatsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
                     <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
-                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#34D399" }} formatter={(v: number) => [`${v}%`, "Battery"]} />
+                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#34D399" }} formatter={(v) => [`${v}%`, "Battery"]} />
                     <Bar dataKey="batteryWakeup" fill="#34D399" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -240,7 +284,7 @@ export default function StatsPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
                     <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 10 }} tickLine={false} axisLine={false} />
                     <YAxis domain={["auto", "auto"]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={32} unit=" bpm" />
-                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#F87171" }} formatter={(v: number) => [`${v} bpm`, "Hvilepuls"]} />
+                    <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#F87171" }} formatter={(v) => [`${v} bpm`, "Hvilepuls"]} />
                     <Line type="monotone" dataKey="restingHr" stroke="#F87171" strokeWidth={2} dot={{ r: 3, fill: "#F87171" }} activeDot={{ r: 5 }} connectNulls />
                   </LineChart>
                 </ResponsiveContainer>
