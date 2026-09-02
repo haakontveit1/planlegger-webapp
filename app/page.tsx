@@ -282,7 +282,7 @@ export default function PlannerPage() {
       <div className="md:flex-1 md:min-h-0 w-[90%] max-w-[1100px] mx-auto pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
 
         {/* ── Left: task list + brain dump ── */}
-        <div className="flex flex-col md:min-h-0">
+        <div className="flex flex-col md:min-h-0 min-w-0">
           {/* DateNav + progress (fixed at top of left column) */}
           <div className="shrink-0">
             <DateNav />
@@ -350,7 +350,7 @@ export default function PlannerPage() {
                     <div className={`task-row flex items-center gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
                       <Checkbox checked={task.status === "completed"} onChange={() => handleToggle(task.id)} size={18} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           {getProjectColor(task.projectId) && (
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
                           )}
