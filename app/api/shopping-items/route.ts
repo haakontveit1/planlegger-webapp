@@ -27,6 +27,6 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  await sql`DELETE FROM shopping_items WHERE checked = 1`;
+  await sql`DELETE FROM shopping_items`;
   return NextResponse.json({ ok: true });
 }

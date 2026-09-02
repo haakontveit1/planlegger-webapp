@@ -36,6 +36,7 @@ interface AppState {
   addShoppingItem: (item: ShoppingItem) => Promise<void>;
   toggleShoppingItem: (id: string) => Promise<void>;
   deleteShoppingItem: (id: string) => Promise<void>;
+  clearShoppingItems: () => Promise<void>;
 
   addTask: (t: Omit<Task, "id" | "createdAt" | "updatedAt" | "sortOrder">) => Promise<Task>;
   toggleTask: (id: string) => Promise<void>;
@@ -121,15 +122,6 @@ export const useStore = create<AppState>((set, get) => ({
     const weekStart = weekStartISO();
     const safeJson = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const safeArr = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
-
-    // Reset checked shopping items once per day
-    try {
-      const lastReset = localStorage.getItem("shopping_reset_date");
-      if (lastReset !== today) {
-        await fetch("/api/shopping-items", { method: "DELETE" });
-        localStorage.setItem("shopping_reset_date", today);
-      }
-    } catch {}
 
     const [rawTasks, projects, routines, routineSessions, brainDumpItems, journalEntry, devGoal, buyItems, projectNotes, brainDumpNotes, shoppingItems] =
       await Promise.all([
@@ -414,6 +406,11 @@ export const useStore = create<AppState>((set, get) => ({
   deleteShoppingItem: async (id) => {
     set((s) => ({ shoppingItems: s.shoppingItems.filter((i) => i.id !== id) }));
     await apiFetch(`/api/shopping-items/${id}`, { method: "DELETE" });
+  },
+
+  clearShoppingItems: async () => {
+    set({ shoppingItems: [] });
+    await apiFetch("/api/shopping-items", { method: "DELETE" });
   },
 
   toggleSound: () => set((s) => ({ soundEnabled: !s.soundEnabled })),

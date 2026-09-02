@@ -46,7 +46,8 @@ export default function EndOfDayPage() {
   const [reflection, setReflection] = useState("");
   const [saved, setSaved] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [weight, setWeight] = useState("");
+  const [weightInput, setWeightInput] = useState("");
+  const [loggedWeight, setLoggedWeight] = useState("");
 
   useEffect(() => {
     if (journalEntry?.date === today) {
@@ -60,18 +61,20 @@ export default function EndOfDayPage() {
       const stored = localStorage.getItem("weight_log");
       if (stored) {
         const { weight: w, savedAt } = JSON.parse(stored);
-        if (new Date(savedAt) >= getLastResetTime()) setWeight(w);
+        if (new Date(savedAt) >= getLastResetTime()) setLoggedWeight(w);
         else localStorage.removeItem("weight_log");
       }
     } catch {}
   }, []);
 
-  function handleWeightChange(val: string) {
-    setWeight(val);
+  function handleLogWeight(e: React.FormEvent) {
+    e.preventDefault();
+    if (!weightInput.trim()) return;
     try {
-      if (val.trim()) localStorage.setItem("weight_log", JSON.stringify({ weight: val, savedAt: new Date().toISOString() }));
-      else localStorage.removeItem("weight_log");
+      localStorage.setItem("weight_log", JSON.stringify({ weight: weightInput, savedAt: new Date().toISOString() }));
     } catch {}
+    setLoggedWeight(weightInput);
+    setWeightInput("");
   }
 
   async function handleSave() {
@@ -122,18 +125,34 @@ export default function EndOfDayPage() {
       {/* Weight */}
       <section className="bg-surface rounded-xl border border-border p-6">
         <h2 className="section-label mb-4">Vekt</h2>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            step="0.1"
-            min={0}
-            value={weight}
-            onChange={(e) => handleWeightChange(e.target.value)}
-            placeholder="—"
-            className="input-base text-2xl font-bold text-center w-36"
-          />
-          <span className="text-lg text-textMuted font-medium">kg</span>
-          {weight && <span className="text-sm text-textMuted ml-2">Lagret ✓</span>}
+        <div className="flex items-center gap-6">
+          <form onSubmit={handleLogWeight} className="flex items-center gap-2">
+            <input
+              type="number"
+              step="0.1"
+              min={0}
+              value={weightInput}
+              onChange={(e) => setWeightInput(e.target.value)}
+              placeholder="0.0"
+              className="input-base text-lg font-semibold text-center w-28"
+            />
+            <span className="text-sm text-textMuted">kg</span>
+            <button
+              type="submit"
+              disabled={!weightInput.trim()}
+              className="px-4 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-sm font-semibold disabled:opacity-40"
+            >
+              Logg
+            </button>
+          </form>
+          <div className="w-px bg-border self-stretch" />
+          <div>
+            <p className="text-xs text-textMuted mb-1">Dagens vekt</p>
+            {loggedWeight
+              ? <p className="text-2xl font-bold text-textPrimary">{loggedWeight} <span className="text-sm font-normal text-textMuted">kg</span></p>
+              : <p className="text-textMuted text-sm">Ikke registrert i dag</p>
+            }
+          </div>
         </div>
       </section>
 

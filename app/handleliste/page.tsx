@@ -9,6 +9,7 @@ export default function HandelistePage() {
   const addShoppingItem = useStore((s) => s.addShoppingItem);
   const toggleShoppingItem = useStore((s) => s.toggleShoppingItem);
   const deleteShoppingItem = useStore((s) => s.deleteShoppingItem);
+  const clearShoppingItems = useStore((s) => s.clearShoppingItems);
 
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,15 +35,25 @@ export default function HandelistePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 md:px-8 py-6 md:py-10">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-textPrimary">Handleliste</h1>
-        <p className="text-sm text-textMuted mt-1">
-          {shoppingItems.length === 0
-            ? "Legg til ting du trenger å kjøpe"
-            : allDone
-            ? "Alt er handlet!"
-            : `${unchecked.length} vare${unchecked.length !== 1 ? "r" : ""} igjen`}
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-textPrimary">Handleliste</h1>
+          <p className="text-sm text-textMuted mt-1">
+            {shoppingItems.length === 0
+              ? "Legg til ting du trenger å kjøpe"
+              : allDone
+              ? "Alt er handlet!"
+              : `${unchecked.length} vare${unchecked.length !== 1 ? "r" : ""} igjen`}
+          </p>
+        </div>
+        {shoppingItems.length > 0 && (
+          <button
+            onClick={() => clearShoppingItems()}
+            className="text-sm text-textMuted hover:text-danger transition-colors px-3 py-1.5 rounded-lg hover:bg-danger/10 border border-border shrink-0"
+          >
+            Tøm listen
+          </button>
+        )}
       </div>
 
       <form onSubmit={handleAdd} className="flex gap-2 mb-6">
