@@ -70,10 +70,17 @@ export default function EndOfDayPage() {
   function handleLogWeight(e: React.FormEvent) {
     e.preventDefault();
     if (!weightInput.trim()) return;
+    const val = weightInput.trim();
     try {
-      localStorage.setItem("weight_log", JSON.stringify({ weight: weightInput, savedAt: new Date().toISOString() }));
+      localStorage.setItem("weight_log", JSON.stringify({ weight: val, savedAt: new Date().toISOString() }));
     } catch {}
-    setLoggedWeight(weightInput);
+    // Persist to DB (fire and forget)
+    fetch("/api/weight-logs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: today, weightKg: parseFloat(val) }),
+    }).catch(() => {});
+    setLoggedWeight(val);
     setWeightInput("");
   }
 
