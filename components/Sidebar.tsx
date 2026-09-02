@@ -10,12 +10,12 @@ const mainItems = [
   { href: "/buy",         label: "Buy",         icon: "◎" },
   { href: "/handleliste", label: "Handleliste", icon: "◉" },
   { href: "/end-of-day",  label: "Tracking",    icon: "◑" },
+  { href: "/stats",       label: "Stats",       icon: "▦" },
 ];
 
 const wipItems = [
   { href: "/calendar", label: "Calendar",  icon: "◻" },
   { href: "/workout",  label: "Workout",   icon: "▣" },
-  { href: "/stats",    label: "Stats",     icon: "▦" },
   { href: "/backlog",  label: "Backlog",   icon: "⊞" },
 ];
 
