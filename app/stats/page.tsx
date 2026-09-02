@@ -50,6 +50,17 @@ async function loadGarminData(): Promise<GarminDay[]> {
   return r.json();
 }
 
+function lastNDays(n: number): string[] {
+  const days: string[] = [];
+  const d = new Date();
+  for (let i = n; i >= 1; i--) {
+    const day = new Date(d);
+    day.setDate(d.getDate() - i);
+    days.push(day.toISOString().split("T")[0]);
+  }
+  return days;
+}
+
 export default function StatsPage() {
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [garminData, setGarminData] = useState<GarminDay[]>([]);
@@ -87,14 +98,14 @@ export default function StatsPage() {
       .catch(() => setSyncStatus("error"));
   }, []);
 
-  async function handleBackfill() {
-    if (missingDays.length === 0 || backfilling) return;
+  async function handleBackfillDates(dates: string[]) {
+    if (dates.length === 0 || backfilling) return;
     setBackfilling(true);
     try {
       const res = await fetch("/api/garmin/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ backfill: missingDays }),
+        body: JSON.stringify({ backfill: dates }),
       });
       const result = await res.json();
       if (result.ok) {
@@ -106,6 +117,8 @@ export default function StatsPage() {
     } catch {}
     setBackfilling(false);
   }
+
+  const isFirstRun = syncStatus === "done" && garminData.length === 0;
 
   const weightChartData = [...weightLogs]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -176,8 +189,25 @@ export default function StatsPage() {
             <span className="text-textMuted/50">Henter data én gang per dag</span>
           </div>
 
-          {/* Backfill notification */}
-          {missingDays.length > 0 && (
+          {/* First-run: no data at all */}
+          {isFirstRun && (
+            <div className="flex items-center justify-between gap-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-5 py-4">
+              <div>
+                <p className="text-sm font-medium text-indigo-400">Ingen Garmin-data ennå</p>
+                <p className="text-xs text-indigo-400/70 mt-0.5">Vil du hente de siste 30 dagene fra Garmin?</p>
+              </div>
+              <button
+                onClick={() => handleBackfillDates(lastNDays(30))}
+                disabled={backfilling}
+                className="shrink-0 px-4 py-2 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {backfilling ? "Henter…" : "Hent siste 30 dager"}
+              </button>
+            </div>
+          )}
+
+          {/* Gap notification: missing days between existing records */}
+          {!isFirstRun && missingDays.length > 0 && (
             <div className="flex items-center justify-between gap-4 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-amber-400">
@@ -189,7 +219,7 @@ export default function StatsPage() {
                 </p>
               </div>
               <button
-                onClick={handleBackfill}
+                onClick={() => handleBackfillDates(missingDays)}
                 disabled={backfilling}
                 className="shrink-0 px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm font-semibold transition-colors disabled:opacity-50"
               >
