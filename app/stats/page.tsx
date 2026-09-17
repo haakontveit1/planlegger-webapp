@@ -79,7 +79,6 @@ function computeGoalLine(
 ): { date: string; goal: number }[] {
   if (logs.length === 0) return [];
   const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
-  const chartStart = new Date(sorted[0].date + "T00:00:00");
   const result: { date: string; goal: number }[] = [];
 
   if (goal.type === "target-date") {
@@ -87,7 +86,8 @@ function computeGoalLine(
     const latestDate = new Date(latest.date + "T00:00:00");
     const endDate = new Date(goal.targetDate + "T00:00:00");
     const totalMs = endDate.getTime() - latestDate.getTime();
-    const cur = new Date(chartStart);
+    // For target-date, draw from earliest log so the trajectory is visible alongside history
+    const cur = new Date(sorted[0].date + "T00:00:00");
     while (cur <= endDate) {
       const d = cur.toISOString().split("T")[0];
       const frac = totalMs > 0 ? (cur.getTime() - latestDate.getTime()) / totalMs : 0;
@@ -99,7 +99,9 @@ function computeGoalLine(
     const ratePerDay = rateKgPerWeek / 7;
     const goalStart = new Date(startDate + "T00:00:00");
     const end = new Date(); end.setDate(end.getDate() + 90);
-    const cur = new Date(chartStart < goalStart ? chartStart : goalStart);
+    // Start strictly from startDate — weight log dates before that show on the
+    // chart via the sorted logs array; the goal line only appears from here on.
+    const cur = new Date(goalStart);
     while (cur <= end) {
       const d = cur.toISOString().split("T")[0];
       const days = (cur.getTime() - goalStart.getTime()) / 86400000;
