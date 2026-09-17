@@ -73,6 +73,10 @@ type WeightGoal =
   | { type: "target-date"; targetDate: string; targetWeight: number }
   | { type: "rate"; rateKgPerWeek: number; startDate: string; startWeight: number };
 
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function computeGoalLine(
   logs: WeightLog[],
   goal: WeightGoal
@@ -86,26 +90,23 @@ function computeGoalLine(
     const latestDate = new Date(latest.date + "T00:00:00");
     const endDate = new Date(goal.targetDate + "T00:00:00");
     const totalMs = endDate.getTime() - latestDate.getTime();
-    // For target-date, draw from earliest log so the trajectory is visible alongside history
     const cur = new Date(sorted[0].date + "T00:00:00");
     while (cur <= endDate) {
-      const d = cur.toISOString().split("T")[0];
       const frac = totalMs > 0 ? (cur.getTime() - latestDate.getTime()) / totalMs : 0;
-      result.push({ date: d, goal: Math.round((latest.weightKg + (goal.targetWeight - latest.weightKg) * frac) * 10) / 10 });
+      result.push({ date: localDateStr(cur), goal: Math.round((latest.weightKg + (goal.targetWeight - latest.weightKg) * frac) * 10) / 10 });
       cur.setDate(cur.getDate() + 1);
     }
   } else {
     const { rateKgPerWeek, startDate, startWeight } = goal;
+    if (!startDate || isNaN(startWeight) || isNaN(rateKgPerWeek)) return [];
     const ratePerDay = rateKgPerWeek / 7;
     const goalStart = new Date(startDate + "T00:00:00");
     const end = new Date(); end.setDate(end.getDate() + 90);
-    // Start strictly from startDate — weight log dates before that show on the
-    // chart via the sorted logs array; the goal line only appears from here on.
     const cur = new Date(goalStart);
     while (cur <= end) {
-      const d = cur.toISOString().split("T")[0];
       const days = (cur.getTime() - goalStart.getTime()) / 86400000;
-      result.push({ date: d, goal: Math.round((startWeight + ratePerDay * days) * 10) / 10 });
+      const goalVal = Math.round((startWeight + ratePerDay * days) * 100) / 100;
+      if (!isNaN(goalVal)) result.push({ date: localDateStr(cur), goal: goalVal });
       cur.setDate(cur.getDate() + 1);
     }
   }
