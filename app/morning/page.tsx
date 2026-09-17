@@ -2,12 +2,11 @@
 import { useState, useEffect } from "react";
 import { todayISO } from "@/lib/utils";
 
-interface WeatherSlot {
-  time: string;
-  temp: number | null;
-  windSpeed: number | null;
-  precipitation: number | null;
-  symbol: string | null;
+interface WeatherPeriod { temp: number | null; symbol: string | null; precipitation: number }
+interface WeatherData {
+  current: { temp: number | null; windSpeed: number | null; symbol: string | null };
+  dayRange: { tempMin: number | null; tempMax: number | null; precipitation: number };
+  periods: { morning: WeatherPeriod; afternoon: WeatherPeriod; evening: WeatherPeriod; night: WeatherPeriod };
 }
 
 interface WeightLog { date: string; weightKg: number }
@@ -33,10 +32,6 @@ function symbolEmoji(code: string | null) {
   return SYMBOL_EMOJI[code] ?? SYMBOL_EMOJI[base] ?? "🌡";
 }
 
-function fmtHour(iso: string) {
-  return new Date(iso).toLocaleTimeString("no-NO", { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatDate(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString("no-NO", {
     weekday: "long", day: "numeric", month: "long",
@@ -51,28 +46,34 @@ function getLastResetTime() {
   return reset;
 }
 
+const PERIODS = [
+  { key: "morning",   label: "Morgen",       sub: "06–12" },
+  { key: "afternoon", label: "Ettermiddag",  sub: "12–18" },
+  { key: "evening",   label: "Kveld",        sub: "18–22" },
+  { key: "night",     label: "Natt",         sub: "22–06" },
+] as const;
+
 export default function MorningPage() {
   const today = todayISO();
-  const [weather, setWeather] = useState<WeatherSlot[]>([]);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [weatherError, setWeatherError] = useState(false);
 
   const [weightInput, setWeightInput] = useState("");
   const [loggedWeight, setLoggedWeight] = useState<string | null>(null);
 
-  // Load weather using browser geolocation, fallback to Oslo
   useEffect(() => {
     function fetchWeather(lat: number, lon: number) {
       fetch(`/api/weather?lat=${lat}&lon=${lon}`)
         .then(r => r.json())
-        .then((data: WeatherSlot[]) => { setWeather(data); setWeatherLoading(false); })
+        .then((d: WeatherData) => { setWeather(d); setWeatherLoading(false); })
         .catch(() => { setWeatherError(true); setWeatherLoading(false); });
     }
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => fetchWeather(pos.coords.latitude, pos.coords.longitude),
-        () => fetchWeather(59.9139, 10.7522),
+        pos => fetchWeather(pos.coords.latitude, pos.coords.longitude),
+        ()  => fetchWeather(59.9139, 10.7522),
         { timeout: 5000 }
       );
     } else {
@@ -80,9 +81,8 @@ export default function MorningPage() {
     }
   }, []);
 
-  // Load today's logged weight from DB (not just localStorage)
+  // Load today's weight from DB first, fall back to localStorage
   useEffect(() => {
-    // Check localStorage first (instant)
     try {
       const stored = localStorage.getItem("weight_log");
       if (stored) {
@@ -92,7 +92,6 @@ export default function MorningPage() {
       }
     } catch {}
 
-    // Then confirm with DB
     fetch("/api/weight-logs")
       .then(r => r.json())
       .then((logs: WeightLog[]) => {
@@ -120,14 +119,6 @@ export default function MorningPage() {
     setWeightInput("");
   }
 
-  const now = new Date();
-  const currentSlot = weather[0];
-  const upcomingSlots = weather.slice(1, 8); // next 7 hours
-
-  const totalPrecip = weather
-    .slice(0, 8)
-    .reduce((sum, s) => sum + (s.precipitation ?? 0), 0);
-
   return (
     <div className="max-w-2xl mx-auto px-4 md:px-8 py-6 md:py-10 space-y-8">
       <div>
@@ -145,7 +136,7 @@ export default function MorningPage() {
               step="0.1"
               min={0}
               value={weightInput}
-              onChange={(e) => setWeightInput(e.target.value)}
+              onChange={e => setWeightInput(e.target.value)}
               placeholder="0.0"
               className="input-base text-lg font-semibold text-center w-28"
               autoFocus
@@ -174,45 +165,52 @@ export default function MorningPage() {
       <section className="bg-surface rounded-xl border border-border p-6">
         <h2 className="text-sm font-bold uppercase tracking-widest text-textMuted mb-4">Vær i dag</h2>
 
-        {weatherLoading && (
-          <p className="text-sm text-textMuted">Henterværdata…</p>
-        )}
+        {weatherLoading && <p className="text-sm text-textMuted">Henter værdata…</p>}
+        {weatherError && <p className="text-sm text-textMuted">Kunne ikke hente værvarselet.</p>}
 
-        {weatherError && (
-          <p className="text-sm text-textMuted">Kunne ikke hente værvarselet.</p>
-        )}
-
-        {!weatherLoading && !weatherError && currentSlot && (
+        {weather && !weatherLoading && (
           <>
-            {/* Current snapshot */}
-            <div className="flex items-center gap-6 mb-6">
-              <span className="text-6xl">{symbolEmoji(currentSlot.symbol)}</span>
+            {/* Hero */}
+            <div className="flex items-center gap-5 mb-5">
+              <span className="text-6xl leading-none">{symbolEmoji(weather.current.symbol)}</span>
               <div>
-                <p className="text-4xl font-bold text-textPrimary">
-                  {currentSlot.temp != null ? `${Math.round(currentSlot.temp)}°` : "–"}
+                <p className="text-5xl font-bold text-textPrimary leading-none">
+                  {weather.current.temp != null ? `${weather.current.temp}°` : "–"}
                 </p>
-                <p className="text-sm text-textMuted mt-1">
-                  {currentSlot.windSpeed != null && `Vind ${Math.round(currentSlot.windSpeed)} m/s`}
-                  {totalPrecip > 0 && ` · Nedbør ${totalPrecip.toFixed(1)} mm neste 8t`}
-                  {totalPrecip === 0 && " · Ingen nedbør neste 8t"}
-                </p>
+                <div className="flex items-center gap-3 mt-2 text-sm text-textMuted flex-wrap">
+                  {weather.dayRange.tempMin != null && weather.dayRange.tempMax != null && (
+                    <span>↓ {weather.dayRange.tempMin}° / ↑ {weather.dayRange.tempMax}°</span>
+                  )}
+                  {weather.current.windSpeed != null && (
+                    <span>💨 {weather.current.windSpeed} m/s</span>
+                  )}
+                  {weather.dayRange.precipitation > 0
+                    ? <span>🌧 {weather.dayRange.precipitation} mm i dag</span>
+                    : <span>☂️ Ingen nedbør i dag</span>
+                  }
+                </div>
               </div>
             </div>
 
-            {/* Hourly strip */}
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {upcomingSlots.map((slot) => (
-                <div key={slot.time} className="flex flex-col items-center gap-1 shrink-0 min-w-[52px]">
-                  <span className="text-xs text-textMuted">{fmtHour(slot.time)}</span>
-                  <span className="text-xl">{symbolEmoji(slot.symbol)}</span>
-                  <span className="text-sm font-semibold text-textPrimary">
-                    {slot.temp != null ? `${Math.round(slot.temp)}°` : "–"}
-                  </span>
-                  {(slot.precipitation ?? 0) > 0 && (
-                    <span className="text-xs text-blue-400">{slot.precipitation?.toFixed(1)}</span>
-                  )}
-                </div>
-              ))}
+            {/* Period cards */}
+            <div className="grid grid-cols-4 gap-3">
+              {PERIODS.map(({ key, label, sub }) => {
+                const p = weather.periods[key];
+                return (
+                  <div key={key} className="flex flex-col items-center gap-1.5 bg-background rounded-xl border border-border px-2 py-3">
+                    <p className="text-xs font-semibold text-textSecondary">{label}</p>
+                    <p className="text-xs text-textMuted">{sub}</p>
+                    <span className="text-2xl leading-none mt-1">{symbolEmoji(p.symbol)}</span>
+                    <p className="text-base font-bold text-textPrimary">
+                      {p.temp != null ? `${p.temp}°` : "–"}
+                    </p>
+                    {p.precipitation > 0
+                      ? <p className="text-xs text-blue-400">{p.precipitation} mm</p>
+                      : <p className="text-xs text-textMuted/40">–</p>
+                    }
+                  </div>
+                );
+              })}
             </div>
           </>
         )}

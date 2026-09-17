@@ -28,11 +28,19 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString("no-NO", { day: "numeric", month: "short" });
 }
 
-function SectionHeader({ title, sub }: { title: string; sub?: string }) {
+function SectionHeader({ title, sub, avg }: { title: string; sub?: string; avg?: string }) {
   return (
-    <div className="mb-4">
-      <h2 className="text-lg font-bold text-textPrimary">{title}</h2>
-      {sub && <p className="text-xs text-textMuted mt-0.5">{sub}</p>}
+    <div className="flex items-start justify-between mb-4">
+      <div>
+        <h2 className="text-lg font-bold text-textPrimary">{title}</h2>
+        {sub && <p className="text-xs text-textMuted mt-0.5">{sub}</p>}
+      </div>
+      {avg && (
+        <div className="text-right shrink-0 ml-4">
+          <p className="text-xs text-textMuted">snitt</p>
+          <p className="text-base font-bold text-textPrimary">{avg}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -63,7 +71,7 @@ function lastNDays(n: number): string[] {
 
 type WeightGoal =
   | { type: "target-date"; targetDate: string; targetWeight: number }
-  | { type: "rate"; rateKgPerWeek: number };
+  | { type: "rate"; rateKgPerWeek: number; startDate: string; startWeight: number };
 
 function computeGoalLine(
   logs: WeightLog[],
@@ -71,39 +79,40 @@ function computeGoalLine(
 ): { date: string; goal: number }[] {
   if (logs.length === 0) return [];
   const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
-  const latest = sorted[sorted.length - 1];
-  const latestDate = new Date(latest.date + "T00:00:00");
-  const latestWeight = latest.weightKg;
-  const startDate = new Date(sorted[0].date + "T00:00:00");
-
+  const chartStart = new Date(sorted[0].date + "T00:00:00");
   const result: { date: string; goal: number }[] = [];
 
   if (goal.type === "target-date") {
+    const latest = sorted[sorted.length - 1];
+    const latestDate = new Date(latest.date + "T00:00:00");
     const endDate = new Date(goal.targetDate + "T00:00:00");
     const totalMs = endDate.getTime() - latestDate.getTime();
-    const cur = new Date(startDate);
+    const cur = new Date(chartStart);
     while (cur <= endDate) {
       const d = cur.toISOString().split("T")[0];
-      const fromLatest = cur.getTime() - latestDate.getTime();
-      const frac = totalMs > 0 ? fromLatest / totalMs : 0;
-      const w = latestWeight + (goal.targetWeight - latestWeight) * frac;
-      result.push({ date: d, goal: Math.round(w * 10) / 10 });
+      const frac = totalMs > 0 ? (cur.getTime() - latestDate.getTime()) / totalMs : 0;
+      result.push({ date: d, goal: Math.round((latest.weightKg + (goal.targetWeight - latest.weightKg) * frac) * 10) / 10 });
       cur.setDate(cur.getDate() + 1);
     }
   } else {
-    const ratePerDay = goal.rateKgPerWeek / 7;
-    const end = new Date();
-    end.setDate(end.getDate() + 60);
-    const cur = new Date(startDate);
+    const { rateKgPerWeek, startDate, startWeight } = goal;
+    const ratePerDay = rateKgPerWeek / 7;
+    const goalStart = new Date(startDate + "T00:00:00");
+    const end = new Date(); end.setDate(end.getDate() + 90);
+    const cur = new Date(chartStart < goalStart ? chartStart : goalStart);
     while (cur <= end) {
       const d = cur.toISOString().split("T")[0];
-      const daysFromLatest = (cur.getTime() - latestDate.getTime()) / 86400000;
-      const w = latestWeight + ratePerDay * daysFromLatest;
-      result.push({ date: d, goal: Math.round(w * 10) / 10 });
+      const days = (cur.getTime() - goalStart.getTime()) / 86400000;
+      result.push({ date: d, goal: Math.round((startWeight + ratePerDay * days) * 10) / 10 });
       cur.setDate(cur.getDate() + 1);
     }
   }
   return result;
+}
+
+function numAvg(vals: (number | null)[]): number | null {
+  const v = vals.filter(x => x != null) as number[];
+  return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null;
 }
 
 export default function StatsPage() {
@@ -120,7 +129,13 @@ export default function StatsPage() {
   const [goalTargetDate, setGoalTargetDate] = useState("");
   const [goalTargetWeight, setGoalTargetWeight] = useState("");
   const [goalRate, setGoalRate] = useState("");
+  const [goalPeriod, setGoalPeriod] = useState<"week" | "month">("week");
+  const [goalStartDate, setGoalStartDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [goalStartWeight, setGoalStartWeight] = useState("");
   const [showGoalForm, setShowGoalForm] = useState(false);
+
+  // Garmin range
+  const [garminRange, setGarminRange] = useState<7 | 14 | 30 | 60>(14);
 
   useEffect(() => {
     // Load saved weight goal
@@ -135,6 +150,8 @@ export default function StatsPage() {
           setGoalTargetWeight(String(parsed.targetWeight));
         } else {
           setGoalRate(String(parsed.rateKgPerWeek));
+          setGoalStartDate(parsed.startDate);
+          setGoalStartWeight(String(parsed.startWeight));
         }
       }
     } catch {}
@@ -196,8 +213,11 @@ export default function StatsPage() {
       if (!goalTargetDate || !goalTargetWeight) return;
       goal = { type: "target-date", targetDate: goalTargetDate, targetWeight: parseFloat(goalTargetWeight) };
     } else {
-      if (!goalRate) return;
-      goal = { type: "rate", rateKgPerWeek: parseFloat(goalRate) };
+      if (!goalRate || !goalStartDate || !goalStartWeight) return;
+      const rateVal = parseFloat(goalRate);
+      // Convert to kg/week regardless of chosen period
+      const rateKgPerWeek = goalPeriod === "month" ? rateVal / 4.33 : rateVal;
+      goal = { type: "rate", rateKgPerWeek, startDate: goalStartDate, startWeight: parseFloat(goalStartWeight) };
     }
     try { localStorage.setItem("weight_goal", JSON.stringify(goal)); } catch {}
     setWeightGoal(goal);
@@ -228,7 +248,7 @@ export default function StatsPage() {
 
   const garminChartData = [...garminData]
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-14)
+    .slice(-garminRange)
     .map(d => ({
       date: fmtDate(d.date),
       steps: d.steps,
@@ -238,6 +258,12 @@ export default function StatsPage() {
       batteryChange: d.bodyBatteryChange,
       restingHr: d.restingHr,
     }));
+
+  const stepsAvg    = numAvg(garminChartData.map(d => d.steps));
+  const sleepAvg    = numAvg(garminChartData.map(d => d.sleepHours));
+  const scoreAvg    = numAvg(garminChartData.map(d => d.sleepScore));
+  const batteryAvg  = numAvg(garminChartData.map(d => d.batteryWakeup));
+  const hrAvg       = numAvg(garminChartData.map(d => d.restingHr));
 
   const garminConfigured = syncStatus !== "no-creds";
 
@@ -285,9 +311,34 @@ export default function StatsPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <input type="number" step="0.01" value={goalRate} onChange={(e) => setGoalRate(e.target.value)} placeholder="f.eks. -0.5" className="input-base text-sm w-28" required />
-                <span className="text-sm text-textMuted">kg/uke (negativt = nedgang)</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <input type="number" step="0.01" value={goalRate} onChange={e => setGoalRate(e.target.value)} placeholder="f.eks. -0.5" className="input-base text-sm w-28" required />
+                  <div className="flex gap-3">
+                    <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
+                      <input type="radio" checked={goalPeriod === "week"} onChange={() => setGoalPeriod("week")} className="accent-amber-400" />
+                      per uke
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
+                      <input type="radio" checked={goalPeriod === "month"} onChange={() => setGoalPeriod("month")} className="accent-amber-400" />
+                      per måned
+                    </label>
+                  </div>
+                  <span className="text-xs text-textMuted">kg (negativt = nedgang)</span>
+                </div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div>
+                    <p className="text-xs text-textMuted mb-1">Startdato</p>
+                    <input type="date" value={goalStartDate} onChange={e => setGoalStartDate(e.target.value)} className="input-base text-sm" required />
+                  </div>
+                  <div>
+                    <p className="text-xs text-textMuted mb-1">Vekt på startdato</p>
+                    <div className="flex items-center gap-1.5">
+                      <input type="number" step="0.1" value={goalStartWeight} onChange={e => setGoalStartWeight(e.target.value)} placeholder="0.0" className="input-base text-sm w-24" required />
+                      <span className="text-sm text-textMuted">kg</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
             <div className="flex gap-2">
@@ -333,14 +384,28 @@ export default function StatsPage() {
         </section>
       ) : (
         <>
-          {/* Sync status bar */}
-          <div className="flex items-center justify-between text-xs text-textMuted px-1">
-            <span>
+          {/* Sync status + range selector */}
+          <div className="flex items-center justify-between gap-4 px-1">
+            <span className="text-xs text-textMuted">
               {syncStatus === "syncing" && "Synkroniserer med Garmin…"}
               {syncStatus === "done" && lastSynced && `Sist hentet: ${fmtDate(lastSynced)}`}
               {syncStatus === "error" && "Garmin sync feilet — sjekk påloggingsdetaljer"}
             </span>
-            <span className="text-textMuted/50">Henter data én gang per dag</span>
+            <div className="flex items-center gap-1">
+              {([7, 14, 30, 60] as const).map(n => (
+                <button
+                  key={n}
+                  onClick={() => setGarminRange(n)}
+                  className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
+                    garminRange === n
+                      ? "bg-accent/20 text-accent font-semibold"
+                      : "text-textMuted hover:text-textSecondary hover:bg-white/5"
+                  }`}
+                >
+                  {n}d
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* First-run: no data at all */}
@@ -384,7 +449,7 @@ export default function StatsPage() {
 
           {/* Steps */}
           <section className="bg-surface rounded-xl border border-border p-6">
-            <SectionHeader title="Skritt" sub="Siste 14 dager" />
+            <SectionHeader title="Skritt" sub={`Siste ${garminRange} dager`} avg={stepsAvg != null ? stepsAvg.toLocaleString("no-NO") : undefined} />
             {garminChartData.filter(d => d.steps != null).length === 0 ? (
               <EmptyChart message="Ingen skrittdata ennå" />
             ) : (
@@ -404,7 +469,7 @@ export default function StatsPage() {
           {/* Sleep */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <section className="bg-surface rounded-xl border border-border p-6">
-              <SectionHeader title="Søvnlengde" sub="Timer per natt" />
+              <SectionHeader title="Søvnlengde" sub="Timer per natt" avg={sleepAvg != null ? `${sleepAvg}t` : undefined} />
               {garminChartData.filter(d => d.sleepHours != null).length === 0 ? (
                 <EmptyChart message="Ingen søvndata ennå" />
               ) : (
@@ -422,7 +487,7 @@ export default function StatsPage() {
             </section>
 
             <section className="bg-surface rounded-xl border border-border p-6">
-              <SectionHeader title="Søvnscore" sub="Garmin søvnkvalitet (0–100)" />
+              <SectionHeader title="Søvnscore" sub="Garmin søvnkvalitet (0–100)" avg={scoreAvg != null ? String(scoreAvg) : undefined} />
               {garminChartData.filter(d => d.sleepScore != null).length === 0 ? (
                 <EmptyChart message="Ingen søvnscore ennå" />
               ) : (
@@ -442,7 +507,7 @@ export default function StatsPage() {
           {/* Body Battery + Resting HR */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <section className="bg-surface rounded-xl border border-border p-6">
-              <SectionHeader title="Body Battery" sub="Nivå ved oppvåkning" />
+              <SectionHeader title="Body Battery" sub="Nivå ved oppvåkning" avg={batteryAvg != null ? `${batteryAvg}%` : undefined} />
               {garminChartData.filter(d => d.batteryWakeup != null).length === 0 ? (
                 <EmptyChart message="Ingen body battery-data ennå" />
               ) : (
@@ -459,7 +524,7 @@ export default function StatsPage() {
             </section>
 
             <section className="bg-surface rounded-xl border border-border p-6">
-              <SectionHeader title="Hvilepuls" sub="BPM per natt" />
+              <SectionHeader title="Hvilepuls" sub="BPM per natt" avg={hrAvg != null ? `${hrAvg} bpm` : undefined} />
               {garminChartData.filter(d => d.restingHr != null).length === 0 ? (
                 <EmptyChart message="Ingen hvilepulsdata ennå" />
               ) : (
