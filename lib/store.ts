@@ -391,16 +391,6 @@ export const useStore = create<AppState>((set, get) => ({
     const updated = { ...item, checked };
     set((s) => ({ shoppingItems: s.shoppingItems.map((i) => i.id === id ? updated : i) }));
     await jsonPatch(`/api/shopping-items/${id}`, { checked });
-    // Auto-complete "Handle på butikken" task when all items are checked
-    if (checked) {
-      const allChecked = get().shoppingItems.every((i) => i.checked);
-      if (allChecked) {
-        const shoppingTask = get().tasks.find(
-          (t) => t.title.toLowerCase() === "handle på butikken" && t.status === "pending"
-        );
-        if (shoppingTask) get().toggleTask(shoppingTask.id);
-      }
-    }
   },
 
   deleteShoppingItem: async (id) => {

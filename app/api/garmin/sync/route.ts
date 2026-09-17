@@ -55,15 +55,30 @@ async function fetchDayFromGarmin(client: any, date: Date, target: string) {
   let bodyBatteryChange: number | null = null;
   let restingHr: number | null = null;
 
-  try { steps = await client.getSteps(date); } catch {}
+  try {
+    const raw = await client.getSteps(date);
+    if (typeof raw === "number") steps = raw;
+    else if (raw && typeof raw === "object") {
+      steps = (raw as any).totalSteps ?? (raw as any).steps ?? (raw as any).value ?? null;
+      if (steps === null && Array.isArray(raw)) {
+        // Some versions return an array of day objects
+        const first = (raw as any[])[0];
+        steps = first?.totalSteps ?? first?.steps ?? null;
+      }
+    }
+  } catch {}
+
   try {
     const sleep = await client.getSleepData(date);
-    sleepSeconds = sleep.dailySleepDTO?.sleepTimeSeconds ?? null;
-    sleepScore = sleep.dailySleepDTO?.sleepScores?.overall?.value ?? null;
-    restingHr = (sleep as any).restingHeartRate ?? null;
-    bodyBatteryChange = (sleep as any).bodyBatteryChange ?? null;
-    const bb = (sleep as any).sleepBodyBattery;
-    if (Array.isArray(bb) && bb.length > 0) bodyBatteryAtWakeup = bb[bb.length - 1].value ?? null;
+    // Handle possible wrapper: { data: { ... } } vs flat response
+    const s = (sleep as any)?.data ?? sleep;
+    sleepSeconds = s?.dailySleepDTO?.sleepTimeSeconds ?? null;
+    sleepScore = s?.dailySleepDTO?.sleepScores?.overall?.value ?? null;
+    // Resting HR may be top-level or inside dailySleepDTO
+    restingHr = s?.restingHeartRate ?? s?.dailySleepDTO?.restingHeartRate ?? null;
+    bodyBatteryChange = s?.bodyBatteryChange ?? s?.dailySleepDTO?.bodyBatteryChange ?? null;
+    const bb = s?.sleepBodyBattery ?? s?.dailySleepDTO?.sleepBodyBattery;
+    if (Array.isArray(bb) && bb.length > 0) bodyBatteryAtWakeup = bb[bb.length - 1]?.value ?? null;
   } catch {}
 
   await sql`

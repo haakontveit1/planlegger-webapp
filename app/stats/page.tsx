@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -61,6 +61,51 @@ function lastNDays(n: number): string[] {
   return days;
 }
 
+type WeightGoal =
+  | { type: "target-date"; targetDate: string; targetWeight: number }
+  | { type: "rate"; rateKgPerWeek: number };
+
+function computeGoalLine(
+  logs: WeightLog[],
+  goal: WeightGoal
+): { date: string; goal: number }[] {
+  if (logs.length === 0) return [];
+  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+  const latest = sorted[sorted.length - 1];
+  const latestDate = new Date(latest.date + "T00:00:00");
+  const latestWeight = latest.weightKg;
+  const startDate = new Date(sorted[0].date + "T00:00:00");
+
+  const result: { date: string; goal: number }[] = [];
+
+  if (goal.type === "target-date") {
+    const endDate = new Date(goal.targetDate + "T00:00:00");
+    const totalMs = endDate.getTime() - latestDate.getTime();
+    const cur = new Date(startDate);
+    while (cur <= endDate) {
+      const d = cur.toISOString().split("T")[0];
+      const fromLatest = cur.getTime() - latestDate.getTime();
+      const frac = totalMs > 0 ? fromLatest / totalMs : 0;
+      const w = latestWeight + (goal.targetWeight - latestWeight) * frac;
+      result.push({ date: d, goal: Math.round(w * 10) / 10 });
+      cur.setDate(cur.getDate() + 1);
+    }
+  } else {
+    const ratePerDay = goal.rateKgPerWeek / 7;
+    const end = new Date();
+    end.setDate(end.getDate() + 60);
+    const cur = new Date(startDate);
+    while (cur <= end) {
+      const d = cur.toISOString().split("T")[0];
+      const daysFromLatest = (cur.getTime() - latestDate.getTime()) / 86400000;
+      const w = latestWeight + ratePerDay * daysFromLatest;
+      result.push({ date: d, goal: Math.round(w * 10) / 10 });
+      cur.setDate(cur.getDate() + 1);
+    }
+  }
+  return result;
+}
+
 export default function StatsPage() {
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [garminData, setGarminData] = useState<GarminDay[]>([]);
@@ -69,7 +114,31 @@ export default function StatsPage() {
   const [missingDays, setMissingDays] = useState<string[]>([]);
   const [backfilling, setBackfilling] = useState(false);
 
+  // Weight goal
+  const [weightGoal, setWeightGoal] = useState<WeightGoal | null>(null);
+  const [goalType, setGoalType] = useState<"target-date" | "rate">("target-date");
+  const [goalTargetDate, setGoalTargetDate] = useState("");
+  const [goalTargetWeight, setGoalTargetWeight] = useState("");
+  const [goalRate, setGoalRate] = useState("");
+  const [showGoalForm, setShowGoalForm] = useState(false);
+
   useEffect(() => {
+    // Load saved weight goal
+    try {
+      const g = localStorage.getItem("weight_goal");
+      if (g) {
+        const parsed = JSON.parse(g) as WeightGoal;
+        setWeightGoal(parsed);
+        setGoalType(parsed.type);
+        if (parsed.type === "target-date") {
+          setGoalTargetDate(parsed.targetDate);
+          setGoalTargetWeight(String(parsed.targetWeight));
+        } else {
+          setGoalRate(String(parsed.rateKgPerWeek));
+        }
+      }
+    } catch {}
+
     fetch("/api/weight-logs").then(r => r.json()).then(setWeightLogs).catch(() => {});
     loadGarminData().then((data) => {
       setGarminData(data);
@@ -120,10 +189,42 @@ export default function StatsPage() {
 
   const isFirstRun = syncStatus === "done" && garminData.length === 0;
 
-  const weightChartData = [...weightLogs]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-60)
-    .map(w => ({ date: fmtDate(w.date), weight: w.weightKg }));
+  function saveGoal(e: React.FormEvent) {
+    e.preventDefault();
+    let goal: WeightGoal | null = null;
+    if (goalType === "target-date") {
+      if (!goalTargetDate || !goalTargetWeight) return;
+      goal = { type: "target-date", targetDate: goalTargetDate, targetWeight: parseFloat(goalTargetWeight) };
+    } else {
+      if (!goalRate) return;
+      goal = { type: "rate", rateKgPerWeek: parseFloat(goalRate) };
+    }
+    try { localStorage.setItem("weight_goal", JSON.stringify(goal)); } catch {}
+    setWeightGoal(goal);
+    setShowGoalForm(false);
+  }
+
+  // Merge weight logs + goal line for the chart
+  const weightChartData = useMemo(() => {
+    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
+    const goalLine = weightGoal ? computeGoalLine(weightLogs, weightGoal) : [];
+    const goalMap = new Map(goalLine.map(g => [g.date, g.goal]));
+
+    const allDatesSet = new Set([
+      ...sorted.map(w => w.date),
+      ...(weightGoal ? goalLine.map(g => g.date) : []),
+    ]);
+    const allDates = Array.from(allDatesSet);
+
+    return allDates
+      .sort()
+      .slice(-90) // show at most 90 days on chart
+      .map(d => ({
+        date: fmtDate(d),
+        weight: sorted.find(w => w.date === d)?.weightKg ?? null,
+        goal: goalMap.get(d) ?? null,
+      }));
+  }, [weightLogs, weightGoal]);
 
   const garminChartData = [...garminData]
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -149,20 +250,73 @@ export default function StatsPage() {
 
       {/* ── Weight ── */}
       <section className="bg-surface rounded-xl border border-border p-6">
-        <SectionHeader
-          title="Vekt"
-          sub={weightLogs.length > 0 ? `${weightLogs.length} målinger logget` : undefined}
-        />
-        {weightChartData.length === 0 ? (
-          <EmptyChart message="Ingen vektmålinger ennå — logg vekten din under Tracking" />
+        <div className="flex items-start justify-between mb-4">
+          <SectionHeader
+            title="Vekt"
+            sub={weightLogs.length > 0 ? `${weightLogs.length} målinger logget` : undefined}
+          />
+          <button
+            onClick={() => setShowGoalForm((v) => !v)}
+            className="text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded border border-border hover:border-accent/50 shrink-0"
+          >
+            {weightGoal ? "Rediger mål" : "Sett mål"}
+          </button>
+        </div>
+
+        {/* Goal form */}
+        {showGoalForm && (
+          <form onSubmit={saveGoal} className="mb-5 p-4 bg-surfaceElevated rounded-xl border border-border space-y-3">
+            <div className="flex gap-3">
+              <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
+                <input type="radio" checked={goalType === "target-date"} onChange={() => setGoalType("target-date")} className="accent-amber-400" />
+                Dato-mål
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
+                <input type="radio" checked={goalType === "rate"} onChange={() => setGoalType("rate")} className="accent-amber-400" />
+                Fast rate
+              </label>
+            </div>
+            {goalType === "target-date" ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <input type="date" value={goalTargetDate} onChange={(e) => setGoalTargetDate(e.target.value)} className="input-base text-sm" required />
+                <div className="flex items-center gap-1.5">
+                  <input type="number" step="0.1" value={goalTargetWeight} onChange={(e) => setGoalTargetWeight(e.target.value)} placeholder="Målvekt" className="input-base text-sm w-24" required />
+                  <span className="text-sm text-textMuted">kg</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input type="number" step="0.01" value={goalRate} onChange={(e) => setGoalRate(e.target.value)} placeholder="f.eks. -0.5" className="input-base text-sm w-28" required />
+                <span className="text-sm text-textMuted">kg/uke (negativt = nedgang)</span>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-1.5 rounded-lg bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors">Lagre</button>
+              {weightGoal && (
+                <button type="button" onClick={() => { try { localStorage.removeItem("weight_goal"); } catch {} setWeightGoal(null); setShowGoalForm(false); }}
+                  className="px-4 py-1.5 rounded-lg text-textMuted text-sm hover:text-danger transition-colors">Fjern mål</button>
+              )}
+            </div>
+          </form>
+        )}
+
+        {weightChartData.filter(d => d.weight != null).length === 0 ? (
+          <EmptyChart message="Ingen vektmålinger ennå — logg vekten din under Morgen" />
         ) : (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={weightChartData} margin={{ left: -10, right: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
               <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={40} unit=" kg" />
-              <Tooltip contentStyle={CHART_STYLE.tooltip} labelStyle={{ color: "#e5e7eb" }} itemStyle={{ color: "#F59E0B" }} formatter={(v) => [`${v} kg`, "Vekt"]} />
+              <YAxis domain={["auto", "auto"]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={60} unit=" kg" />
+              <Tooltip
+                contentStyle={CHART_STYLE.tooltip}
+                labelStyle={{ color: "#e5e7eb" }}
+                formatter={(v, name) => [`${v} kg`, name === "weight" ? "Vekt" : "Mål"]}
+              />
               <Line type="monotone" dataKey="weight" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3, fill: "#F59E0B" }} activeDot={{ r: 5 }} connectNulls />
+              {weightGoal && (
+                <Line type="monotone" dataKey="goal" stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="5 5" dot={false} connectNulls opacity={0.5} />
+              )}
             </LineChart>
           </ResponsiveContainer>
         )}

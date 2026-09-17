@@ -3,14 +3,6 @@ import { useState, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
 
-function getLastResetTime() {
-  const now = new Date();
-  const reset = new Date(now);
-  reset.setHours(5, 0, 0, 0);
-  if (now < reset) reset.setDate(reset.getDate() - 1);
-  return reset;
-}
-
 function tomorrowISO() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -46,8 +38,6 @@ export default function EndOfDayPage() {
   const [reflection, setReflection] = useState("");
   const [saved, setSaved] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [weightInput, setWeightInput] = useState("");
-  const [loggedWeight, setLoggedWeight] = useState("");
 
   useEffect(() => {
     if (journalEntry?.date === today) {
@@ -55,34 +45,6 @@ export default function EndOfDayPage() {
       setReflection(journalEntry.ratingNote ?? "");
     }
   }, [journalEntry, today]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("weight_log");
-      if (stored) {
-        const { weight: w, savedAt } = JSON.parse(stored);
-        if (new Date(savedAt) >= getLastResetTime()) setLoggedWeight(w);
-        else localStorage.removeItem("weight_log");
-      }
-    } catch {}
-  }, []);
-
-  function handleLogWeight(e: React.FormEvent) {
-    e.preventDefault();
-    if (!weightInput.trim()) return;
-    const val = weightInput.trim();
-    try {
-      localStorage.setItem("weight_log", JSON.stringify({ weight: val, savedAt: new Date().toISOString() }));
-    } catch {}
-    // Persist to DB (fire and forget)
-    fetch("/api/weight-logs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: today, weightKg: parseFloat(val) }),
-    }).catch(() => {});
-    setLoggedWeight(val);
-    setWeightInput("");
-  }
 
   async function handleSave() {
     await saveJournal({
@@ -128,40 +90,6 @@ export default function EndOfDayPage() {
         <h1 className="text-3xl font-bold text-textPrimary">Tracking</h1>
         <p className="text-sm text-textMuted mt-1">{formatDate(today)}</p>
       </div>
-
-      {/* Weight */}
-      <section className="bg-surface rounded-xl border border-border p-6">
-        <h2 className="section-label mb-4">Vekt</h2>
-        <div className="flex items-center gap-6">
-          <form onSubmit={handleLogWeight} className="flex items-center gap-2">
-            <input
-              type="number"
-              step="0.1"
-              min={0}
-              value={weightInput}
-              onChange={(e) => setWeightInput(e.target.value)}
-              placeholder="0.0"
-              className="input-base text-lg font-semibold text-center w-28"
-            />
-            <span className="text-sm text-textMuted">kg</span>
-            <button
-              type="submit"
-              disabled={!weightInput.trim()}
-              className="px-4 py-2 rounded-lg bg-accent/15 text-accent hover:bg-accent/25 transition-colors text-sm font-semibold disabled:opacity-40"
-            >
-              Logg
-            </button>
-          </form>
-          <div className="w-px bg-border self-stretch" />
-          <div>
-            <p className="text-xs text-textMuted mb-1">Dagens vekt</p>
-            {loggedWeight
-              ? <p className="text-2xl font-bold text-textPrimary">{loggedWeight} <span className="text-sm font-normal text-textMuted">kg</span></p>
-              : <p className="text-textMuted text-sm">Ikke registrert i dag</p>
-            }
-          </div>
-        </div>
-      </section>
 
       {/* Day score */}
       <section className="bg-surface rounded-xl border border-border p-6">

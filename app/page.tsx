@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { todayISO, formatDuration } from "@/lib/utils";
 import Checkbox from "@/components/Checkbox";
@@ -204,6 +205,24 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
+  const router = useRouter();
+
+  // Time-based routing: redirect once per session on first open
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("time-routed")) return;
+      const h = new Date().getHours();
+      if (h >= 6 && h < 9) {
+        sessionStorage.setItem("time-routed", "1");
+        router.replace("/morning");
+      } else if (h >= 21 || h < 2) {
+        sessionStorage.setItem("time-routed", "1");
+        router.replace("/end-of-day");
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tasks = useStore((s) => s.tasks);
   const projects = useStore((s) => s.projects);
   const selectedDate = useStore((s) => s.selectedDate);
