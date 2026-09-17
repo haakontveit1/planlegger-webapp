@@ -226,26 +226,17 @@ export default function StatsPage() {
     setShowGoalForm(false);
   }
 
-  // Merge weight logs + goal line for the chart
+  // Chart is driven entirely by logged dates — goal line is just an overlay
   const weightChartData = useMemo(() => {
     const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
     const goalLine = weightGoal ? computeGoalLine(weightLogs, weightGoal) : [];
     const goalMap = new Map(goalLine.map(g => [g.date, g.goal]));
 
-    const allDatesSet = new Set([
-      ...sorted.map(w => w.date),
-      ...(weightGoal ? goalLine.map(g => g.date) : []),
-    ]);
-    const allDates = Array.from(allDatesSet);
-
-    return allDates
-      .sort()
-      .slice(-90) // show at most 90 days on chart
-      .map(d => ({
-        date: fmtDate(d),
-        weight: sorted.find(w => w.date === d)?.weightKg ?? null,
-        goal: goalMap.get(d) ?? null,
-      }));
+    return sorted.map(w => ({
+      date: fmtDate(w.date),
+      weight: w.weightKg,
+      goal: goalMap.get(w.date) ?? null,
+    }));
   }, [weightLogs, weightGoal]);
 
   const garminChartData = [...garminData]
