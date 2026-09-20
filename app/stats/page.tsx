@@ -283,35 +283,6 @@ export default function StatsPage() {
           </button>
         </div>
 
-        {/* Active goal summary */}
-        {weightGoal && !showGoalForm && (
-          <div className="mb-4 flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/8 border border-accent/20 text-sm">
-            <span className="text-accent text-base leading-none">◎</span>
-            {weightGoal.type === "target-date" ? (
-              <span className="text-textSecondary">
-                Mål: <span className="text-textPrimary font-semibold">{weightGoal.targetWeight} kg</span>
-                {" "}innen{" "}
-                <span className="text-textPrimary font-semibold">
-                  {new Date(weightGoal.targetDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-              </span>
-            ) : (
-              <span className="text-textSecondary">
-                Rate:{" "}
-                <span className="text-textPrimary font-semibold">
-                  {weightGoal.rateKgPerWeek >= 0 ? "+" : ""}{weightGoal.rateKgPerWeek.toFixed(2)} kg/uke
-                </span>
-                {" · "}startdato{" "}
-                <span className="text-textPrimary font-semibold">
-                  {new Date(weightGoal.startDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-                {" · "}startvekt{" "}
-                <span className="text-textPrimary font-semibold">{weightGoal.startWeight} kg</span>
-              </span>
-            )}
-          </div>
-        )}
-
         {/* Goal form */}
         {showGoalForm && (
           <form onSubmit={saveGoal} className="mb-5 p-4 bg-surfaceElevated rounded-xl border border-border space-y-3">
@@ -393,6 +364,35 @@ export default function StatsPage() {
               )}
             </LineChart>
           </ResponsiveContainer>
+        )}
+
+        {/* Active goal summary — below chart */}
+        {weightGoal && !showGoalForm && (
+          <div className="mt-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/8 border border-accent/20 text-sm">
+            <span className="text-accent text-base leading-none">◎</span>
+            {weightGoal.type === "target-date" ? (
+              <span className="text-textSecondary">
+                Mål: <span className="text-textPrimary font-semibold">{weightGoal.targetWeight} kg</span>
+                {" "}innen{" "}
+                <span className="text-textPrimary font-semibold">
+                  {new Date(weightGoal.targetDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </span>
+            ) : (
+              <span className="text-textSecondary">
+                Rate:{" "}
+                <span className="text-textPrimary font-semibold">
+                  {weightGoal.rateKgPerWeek >= 0 ? "+" : ""}{weightGoal.rateKgPerWeek.toFixed(2)} kg/uke
+                </span>
+                {" · "}startdato{" "}
+                <span className="text-textPrimary font-semibold">
+                  {new Date(weightGoal.startDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+                {" · "}startvekt{" "}
+                <span className="text-textPrimary font-semibold">{weightGoal.startWeight} kg</span>
+              </span>
+            )}
+          </div>
         )}
       </section>
 
