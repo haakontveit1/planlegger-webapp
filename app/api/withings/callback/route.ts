@@ -20,6 +20,11 @@ export async function GET(req: Request) {
 
   const base = process.env.NEXT_PUBLIC_BASE_URL ?? new URL(req.url).origin;
 
+  // Withings pings the URL with no params as a reachability check
+  if (!code && !error) {
+    return new NextResponse("OK", { status: 200 });
+  }
+
   if (error || !code) {
     return NextResponse.redirect(`${base}/settings?withings=error`);
   }
