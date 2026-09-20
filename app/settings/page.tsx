@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { PRESETS, Theme, applyTheme, loadTheme, saveTheme } from "@/components/ThemeProvider";
 
 const SWATCH_FIELDS: { key: keyof Omit<Theme, "name">; label: string; hint: string }[] = [
@@ -12,10 +12,24 @@ const SWATCH_FIELDS: { key: keyof Omit<Theme, "name">; label: string; hint: stri
   { key: "textMuted", label: "Text muted", hint: "Hints & timestamps" },
 ];
 
+type WithingsStatus = "loading" | "connected" | "disconnected" | "unconfigured";
+
 export default function SettingsPage() {
   const [active, setActive] = useState<Theme>(PRESETS[0]);
   const [custom, setCustom] = useState<Theme>({ ...PRESETS[0], name: "Custom" });
   const [tab, setTab] = useState<"presets" | "custom">("presets");
+  const [withingsStatus, setWithingsStatus] = useState<WithingsStatus>("loading");
+  const [withingsMsg, setWithingsMsg] = useState<string | null>(null);
+
+  const fetchWithingsStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/withings/status");
+      const data = await res.json() as { connected: boolean };
+      setWithingsStatus(data.connected ? "connected" : "disconnected");
+    } catch {
+      setWithingsStatus("unconfigured");
+    }
+  }, []);
 
   useEffect(() => {
     const saved = loadTheme();
@@ -25,7 +39,15 @@ export default function SettingsPage() {
       setCustom(saved);
       setTab("custom");
     }
-  }, []);
+    fetchWithingsStatus();
+
+    // Read ?withings= param from URL
+    const sp = new URLSearchParams(window.location.search);
+    const w = sp.get("withings");
+    if (w === "connected") setWithingsMsg("Withings tilkoblet! Vekten din synkroniseres automatisk.");
+    if (w === "error") setWithingsMsg("Noe gikk galt. Prøv igjen.");
+    if (w) window.history.replaceState({}, "", "/settings");
+  }, [fetchWithingsStatus]);
 
   function apply(theme: Theme) {
     setActive(theme);
@@ -41,6 +63,12 @@ export default function SettingsPage() {
     background: theme.bg,
     borderColor: theme.border,
   });
+
+  async function disconnectWithings() {
+    await fetch("/api/withings/status", { method: "DELETE" });
+    setWithingsStatus("disconnected");
+    setWithingsMsg("Withings frakoblet.");
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-10">
@@ -154,6 +182,57 @@ export default function SettingsPage() {
             >
               Apply custom theme
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Withings integration */}
+      <div className="bg-surface rounded-xl border border-border p-6 mt-6">
+        <h2 className="section-label mb-1">Withings smart scale</h2>
+        <p className="text-xs text-textMuted mb-5">Koble til Withings for å synkronisere vektmålinger automatisk</p>
+
+        {withingsMsg && (
+          <div className={`mb-4 px-3 py-2 rounded-lg text-sm border ${
+            withingsMsg.includes("galt")
+              ? "bg-red-500/10 border-red-500/20 text-red-400"
+              : "bg-green-500/10 border-green-500/20 text-green-400"
+          }`}>
+            {withingsMsg}
+          </div>
+        )}
+
+        {withingsStatus === "loading" && (
+          <p className="text-sm text-textMuted">Laster…</p>
+        )}
+
+        {withingsStatus === "connected" && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+              <span className="text-sm text-textPrimary">Tilkoblet</span>
+            </div>
+            <button
+              onClick={disconnectWithings}
+              className="text-xs px-3 py-1.5 rounded-lg border border-border text-textMuted hover:text-textPrimary hover:border-textSecondary transition-colors"
+            >
+              Koble fra
+            </button>
+          </div>
+        )}
+
+        {(withingsStatus === "disconnected" || withingsStatus === "unconfigured") && (
+          <div className="space-y-3">
+            {withingsStatus === "unconfigured" && (
+              <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-lg px-3 py-2">
+                Legg til <code className="font-mono">WITHINGS_CLIENT_ID</code>, <code className="font-mono">WITHINGS_CLIENT_SECRET</code> og <code className="font-mono">NEXT_PUBLIC_BASE_URL</code> i Vercel-miljøvariablene.
+              </p>
+            )}
+            <a
+              href="/api/withings/auth"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accentLight transition-colors"
+            >
+              Koble til Withings
+            </a>
           </div>
         )}
       </div>
