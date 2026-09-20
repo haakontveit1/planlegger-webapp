@@ -13,6 +13,7 @@ const mainItems = [
   { href: "/end-of-day",  label: "Dagsplan",    icon: "◑" },
   { href: "/stats",       label: "Stats",       icon: "▦" },
   { href: "/workout",     label: "Treningsstyrke", icon: "▣" },
+  { href: "/withings",   label: "Withings",       icon: "◉" },
 ];
 
 const wipItems = [

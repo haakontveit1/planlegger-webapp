@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/neon";
 
+async function ensureTables() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS withings_measurements (
+      date  TEXT    NOT NULL,
+      type  INTEGER NOT NULL,
+      value REAL    NOT NULL,
+      PRIMARY KEY (date, type)
+    )
+  `;
+}
+
 async function getValidToken(userId: string): Promise<string | null> {
   const rows = await sql`SELECT * FROM withings_tokens WHERE user_id = ${userId}`;
   if (rows.length === 0) return null;
@@ -48,6 +59,9 @@ function toDateStr(unixSeconds: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Withings measurement types we care about
+const MEAS_TYPES = new Set([1, 5, 6, 8, 76, 77, 88]);
+
 export async function POST(req: Request) {
   const text = await req.text();
   const params = new URLSearchParams(text);
@@ -65,9 +79,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
+  await ensureTables();
+
   const measureUrl = new URL("https://wbsapi.withings.net/measure");
   measureUrl.searchParams.set("action", "getmeas");
-  measureUrl.searchParams.set("meastype", "1");
+  measureUrl.searchParams.set("meastypes", Array.from(MEAS_TYPES).join(","));
   measureUrl.searchParams.set("category", "1");
   measureUrl.searchParams.set("startdate", startdate);
   measureUrl.searchParams.set("enddate", enddate);
@@ -86,16 +102,25 @@ export async function POST(req: Request) {
   }
 
   for (const group of measureData.body?.measuregroups ?? []) {
+    const dateStr = toDateStr(group.date);
     for (const measure of group.measures) {
-      if (measure.type !== 1) continue;
-      const weightKg = parseFloat((measure.value * Math.pow(10, measure.unit)).toFixed(2));
-      const dateStr = toDateStr(group.date);
+      if (!MEAS_TYPES.has(measure.type)) continue;
+      const value = parseFloat((measure.value * Math.pow(10, measure.unit)).toFixed(3));
 
       await sql`
-        INSERT INTO weight_logs (date, weight_kg, created_at)
-        VALUES (${dateStr}, ${weightKg}, ${new Date().toISOString()})
-        ON CONFLICT (date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg
+        INSERT INTO withings_measurements (date, type, value)
+        VALUES (${dateStr}, ${measure.type}, ${value})
+        ON CONFLICT (date, type) DO UPDATE SET value = EXCLUDED.value
       `;
+
+      // Keep weight_logs in sync for the Stats page
+      if (measure.type === 1) {
+        await sql`
+          INSERT INTO weight_logs (date, weight_kg, created_at)
+          VALUES (${dateStr}, ${value}, ${new Date().toISOString()})
+          ON CONFLICT (date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg
+        `;
+      }
     }
   }
 
