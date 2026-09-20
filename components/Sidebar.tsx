@@ -4,16 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const mainItems = [
-  { href: "/morning",     label: "Morgen",      icon: "○" },
-  { href: "/",            label: "Planner",     icon: "✦" },
-  { href: "/braindump",   label: "Brain Dump",  icon: "✎" },
-  { href: "/projects",    label: "Projects",    icon: "◈" },
-  { href: "/buy",         label: "Buy",         icon: "◎" },
-  { href: "/handleliste", label: "Handleliste", icon: "◉" },
-  { href: "/end-of-day",  label: "Dagsplan",    icon: "◑" },
-  { href: "/stats",       label: "Stats",       icon: "▦" },
+  { href: "/",            label: "Planner",        icon: "✦" },
+  { href: "/projects",    label: "Projects",       icon: "◈" },
+  { href: "/handleliste", label: "Handleliste",    icon: "◉" },
+  { href: "/stats",       label: "Stats",          icon: "▦" },
   { href: "/workout",     label: "Treningsstyrke", icon: "▣" },
-  { href: "/withings",   label: "Withings",       icon: "◉" },
+  { href: "/withings",    label: "Withings",       icon: "◈" },
+  { href: "/buy",         label: "Buy",            icon: "◎" },
 ];
 
 const wipItems = [

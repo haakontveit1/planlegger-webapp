@@ -12,12 +12,26 @@ function rowToItem(r: Record<string, unknown>): ShoppingItem {
   };
 }
 
+async function ensureTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS shopping_items (
+      id         TEXT PRIMARY KEY,
+      text       TEXT NOT NULL,
+      checked    INTEGER NOT NULL DEFAULT 0,
+      sort_order REAL NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `;
+}
+
 export async function GET() {
+  await ensureTable();
   const rows = await sql`SELECT * FROM shopping_items ORDER BY sort_order ASC, created_at ASC`;
   return NextResponse.json(rows.map(rowToItem));
 }
 
 export async function POST(req: Request) {
+  await ensureTable();
   const item = (await req.json()) as ShoppingItem;
   await sql`
     INSERT INTO shopping_items (id, text, checked, sort_order, created_at)

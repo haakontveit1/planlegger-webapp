@@ -137,6 +137,29 @@ export default function StatsPage() {
   const [goalStartWeight, setGoalStartWeight] = useState("");
   const [showGoalForm, setShowGoalForm] = useState(false);
 
+  // Manual weight input
+  const [weightInput, setWeightInput] = useState("");
+  const [weightDateInput, setWeightDateInput] = useState(() => localDateStr(new Date()));
+  const [weightSaving, setWeightSaving] = useState(false);
+
+  async function handleLogWeight(e: React.FormEvent) {
+    e.preventDefault();
+    const kg = parseFloat(weightInput);
+    if (isNaN(kg) || !weightDateInput) return;
+    setWeightSaving(true);
+    try {
+      await fetch("/api/weight-logs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: weightDateInput, weightKg: kg }),
+      });
+      const updated = await fetch("/api/weight-logs").then(r => r.json());
+      setWeightLogs(updated);
+      setWeightInput("");
+    } catch {}
+    setWeightSaving(false);
+  }
+
   // Garmin range
   const [garminRange, setGarminRange] = useState<7 | 14 | 30 | 60>(14);
 
@@ -346,7 +369,7 @@ export default function StatsPage() {
         )}
 
         {weightChartData.filter(d => d.weight != null).length === 0 ? (
-          <EmptyChart message="Ingen vektmålinger ennå — logg vekten din under Morgen" />
+          <EmptyChart message="Ingen vektmålinger ennå — bruk skjemaet nedenfor" />
         ) : (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={weightChartData} margin={{ left: -10, right: 8 }}>
@@ -394,6 +417,34 @@ export default function StatsPage() {
             )}
           </div>
         )}
+
+        {/* Manual weight input */}
+        <form onSubmit={handleLogWeight} className="mt-4 flex items-center gap-2 flex-wrap">
+          <input
+            type="date"
+            value={weightDateInput}
+            onChange={e => setWeightDateInput(e.target.value)}
+            className="input-base text-sm"
+          />
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              step="0.1"
+              value={weightInput}
+              onChange={e => setWeightInput(e.target.value)}
+              placeholder="f.eks. 82.5"
+              className="input-base text-sm w-28"
+            />
+            <span className="text-sm text-textMuted">kg</span>
+          </div>
+          <button
+            type="submit"
+            disabled={!weightInput || weightSaving}
+            className="px-4 py-2 rounded-xl bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
+          >
+            {weightSaving ? "Lagrer…" : "Logg vekt"}
+          </button>
+        </form>
       </section>
 
       {/* ── Garmin ── */}
