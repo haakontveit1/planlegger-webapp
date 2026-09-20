@@ -82,7 +82,7 @@ function MetricChart({
               borderRadius: 8,
               fontSize: 12,
             }}
-            formatter={(v: number) => [`${v.toFixed(decimals)} ${unit}`, label]}
+            formatter={(v) => [`${Number(v).toFixed(decimals)} ${unit}`, label]}
             labelStyle={{ color: "var(--color-textMuted)" }}
           />
           <Line
