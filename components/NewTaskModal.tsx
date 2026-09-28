@@ -112,9 +112,6 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
                   >
                     <span className="text-accent text-sm shrink-0">⟳</span>
                     <span className="flex-1 text-textPrimary text-sm">{r.title}</span>
-                    {r.defaultDurationMinutes && (
-                      <span className="text-textMuted text-xs shrink-0">{formatDuration(r.defaultDurationMinutes)}</span>
-                    )}
                   </button>
                 ))}
               </div>
