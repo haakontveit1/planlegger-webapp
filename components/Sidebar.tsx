@@ -3,19 +3,34 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const mainItems = [
-  { href: "/",            label: "Planner",        icon: "✦" },
-  { href: "/projects",    label: "Projects",       icon: "◈" },
-  { href: "/handleliste", label: "Handleliste",    icon: "◉" },
-  { href: "/stats",       label: "Stats",          icon: "▦" },
-  { href: "/workout",     label: "Treningsstyrke", icon: "▣" },
-  { href: "/withings",    label: "Withings",       icon: "◈" },
-  { href: "/buy",         label: "Buy",            icon: "◎" },
+const navGroups: { label: string | null; items: { href: string; label: string; icon: string }[] }[] = [
+  {
+    label: null,
+    items: [
+      { href: "/",         label: "Planner",  icon: "✦" },
+      { href: "/projects", label: "Projects", icon: "◈" },
+    ],
+  },
+  {
+    label: "Shopping",
+    items: [
+      { href: "/handleliste", label: "Handleliste", icon: "◉" },
+      { href: "/buy",         label: "Buy",         icon: "◎" },
+    ],
+  },
+  {
+    label: "Stats",
+    items: [
+      { href: "/stats",    label: "Garmin",          icon: "▦" },
+      { href: "/withings", label: "Withings",        icon: "◈" },
+      { href: "/workout",  label: "Treningsstyrke",  icon: "▣" },
+    ],
+  },
 ];
 
 const wipItems = [
-  { href: "/calendar", label: "Calendar",  icon: "◻" },
-  { href: "/backlog",  label: "Backlog",   icon: "⊞" },
+  { href: "/calendar", label: "Calendar", icon: "◻" },
+  { href: "/backlog",  label: "Backlog",  icon: "⊞" },
 ];
 
 export default function Sidebar() {
@@ -53,9 +68,18 @@ export default function Sidebar() {
     return (
       <>
         <nav className="flex-1 py-4 overflow-y-auto flex flex-col">
-          <div className="space-y-0.5 flex-1">
-            {mainItems.map((item) => (
-              <NavLink key={item.href} {...item} onNav={onNav} />
+          <div className="flex-1 space-y-4">
+            {navGroups.map((group, i) => (
+              <div key={i}>
+                {group.label && (
+                  <p className="px-6 pb-1 text-2xs font-bold tracking-widest uppercase text-textMuted/50">{group.label}</p>
+                )}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => (
+                    <NavLink key={item.href} {...item} onNav={onNav} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
           <div className="mt-4 pt-3 border-t border-border/50">

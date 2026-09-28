@@ -287,8 +287,8 @@ export default function StatsPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-10 space-y-10">
       <div>
-        <h1 className="text-3xl font-bold text-textPrimary">Stats</h1>
-        <p className="text-sm text-textMuted mt-1">Your health and activity over time</p>
+        <h1 className="text-3xl font-bold text-textPrimary">Garmin</h1>
+        <p className="text-sm text-textMuted mt-1">Helse og aktivitet over tid</p>
       </div>
 
       {/* ── Weight ── */}

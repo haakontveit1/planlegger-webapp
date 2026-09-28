@@ -1,15 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useStore } from "@/lib/store";
-import { todayISO, formatDuration } from "@/lib/utils";
+import { todayISO } from "@/lib/utils";
 
 interface Props {
   defaultProjectId?: string;
   defaultBacklog?: boolean;
   onClose: () => void;
 }
-
-const PRESETS = [10, 15, 30, 60];
 
 export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose }: Props) {
   const addTask = useStore((s) => s.addTask);
@@ -20,8 +18,6 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
   const [title, setTitle] = useState("");
   const [isBacklog, setIsBacklog] = useState(defaultBacklog ?? false);
   const [notes, setNotes] = useState("");
-  const [hasDuration, setHasDuration] = useState(true);
-  const [duration, setDuration] = useState(30);
   const [projectId, setProjectId] = useState<string | null>(defaultProjectId ?? null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -41,7 +37,6 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
 
   function applySuggestion(r: typeof routines[0]) {
     setTitle(r.title);
-    if (r.defaultDurationMinutes) { setHasDuration(true); setDuration(r.defaultDurationMinutes); }
     if (r.projectId) setProjectId(r.projectId);
     setShowSuggestions(false);
     titleRef.current?.focus();
@@ -58,7 +53,7 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
       category: "private",
       lane: "afterwork",
       customer: null,
-      durationMinutes: hasDuration ? duration : null,
+      durationMinutes: null,
       isBacklog,
       projectId: projectId || null,
       dueDate: isBacklog ? null : todayISO(),
@@ -69,7 +64,7 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
       await addRoutine({
         title: trimmed,
         projectId: projectId || null,
-        defaultDurationMinutes: hasDuration ? duration : null,
+        defaultDurationMinutes: null,
         description: null,
       });
     }
@@ -154,41 +149,6 @@ export default function NewTaskModal({ defaultProjectId, defaultBacklog, onClose
                 {backlog ? "Backlog" : "Today"}
               </button>
             ))}
-          </div>
-
-          {/* Duration */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="section-label">Duration</span>
-              <button
-                type="button"
-                onClick={() => setHasDuration((h) => !h)}
-                className={`text-xs font-medium px-3 py-1 rounded-full transition-colors ${
-                  hasDuration ? "bg-accent/20 text-accent" : "bg-surface text-textMuted border border-border"
-                }`}
-              >
-                {hasDuration ? "Set" : "None"}
-              </button>
-            </div>
-            {hasDuration && (
-              <>
-                <div className="flex items-center gap-3 mb-3">
-                  <button type="button" onClick={() => setDuration((d) => Math.max(5, d - 5))}
-                    className="w-9 h-9 rounded-lg border border-border text-textSecondary hover:text-textPrimary flex items-center justify-center transition-colors">−</button>
-                  <span className="text-xl font-bold text-textPrimary flex-1 text-center">{formatDuration(duration)}</span>
-                  <button type="button" onClick={() => setDuration((d) => Math.min(480, d + 5))}
-                    className="w-9 h-9 rounded-lg border border-border text-textSecondary hover:text-textPrimary flex items-center justify-center transition-colors">+</button>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {PRESETS.map((p) => (
-                    <button key={p} type="button" onClick={() => setDuration(p)}
-                      className={`chip ${duration === p ? "chip-active" : "chip-inactive"}`}>
-                      {formatDuration(p)}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
 
           {/* Project */}

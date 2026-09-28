@@ -102,13 +102,35 @@ function MetricChart({
 export default function WithingsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  async function loadMeasurements() {
+    const data: Row[] = await fetch("/api/withings/measurements").then(r => r.json()).catch(() => []);
+    setRows(data);
+  }
 
   useEffect(() => {
-    fetch("/api/withings/measurements")
-      .then(r => r.json())
-      .then((data: Row[]) => { setRows(data); setLoading(false); })
-      .catch(() => setLoading(false));
+    loadMeasurements().finally(() => setLoading(false));
   }, []);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/withings/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }) });
+      const data = await res.json() as { ok?: boolean; count?: number; error?: string };
+      if (data.ok) {
+        setSyncMsg(`Synkronisert ${data.count ?? 0} målinger`);
+        await loadMeasurements();
+      } else {
+        setSyncMsg(data.error ?? "Noe gikk galt");
+      }
+    } catch {
+      setSyncMsg("Noe gikk galt");
+    }
+    setSyncing(false);
+  }
 
   const byType = useMemo(() => {
     const map = new Map<number, { date: string; value: number }[]>();
@@ -123,9 +145,21 @@ export default function WithingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-textPrimary">Withings</h1>
-        <p className="text-sm text-textMuted mt-1">Kroppsmålinger fra smart-vekten</p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-textPrimary">Withings</h1>
+          <p className="text-sm text-textMuted mt-1">Kroppsmålinger fra smart-vekten</p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="px-4 py-2 rounded-xl bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40 shrink-0"
+          >
+            {syncing ? "Synkroniserer…" : "Synkroniser historikk"}
+          </button>
+          {syncMsg && <p className="text-xs text-textMuted">{syncMsg}</p>}
+        </div>
       </div>
 
       {loading && (

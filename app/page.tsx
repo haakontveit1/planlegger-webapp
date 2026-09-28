@@ -1,14 +1,11 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { todayISO, formatDuration } from "@/lib/utils";
+import { todayISO } from "@/lib/utils";
 import Checkbox from "@/components/Checkbox";
 import DateNav from "@/components/DateNav";
 import { SortableList } from "@/components/SortableList";
 import { Task } from "@/lib/db";
-
-const DURATION_QUICK = [15, 30, 60, 90, 120, 180];
 
 // ── Inline add-task form ──────────────────────────────────────────────────────
 function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: () => void }) {
@@ -19,8 +16,6 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
   const [title, setTitle] = useState("");
   const [isBacklog, setIsBacklog] = useState(false);
-  const [durationStr, setDurationStr] = useState("30");
-  const [hasDuration, setHasDuration] = useState(true);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -28,15 +23,13 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const SHOPPING_TASK = { id: "__shopping__", title: "Handle på butikken", defaultDurationMinutes: 60, projectId: null };
+  const SHOPPING_TASK = { id: "__shopping__", title: "Handle på butikken", defaultDurationMinutes: 0, projectId: null };
 
   const routineSuggestions = title.trim().length > 0
     ? routines.filter((r) => r.title.toLowerCase().includes(title.toLowerCase()))
     : routines.slice(0, 6);
 
-  const showShoppingSuggestion =
-    title.trim().length >= 3 &&
-    "handle på butikken".includes(title.toLowerCase());
+  const showShoppingSuggestion = title.trim().length >= 3 && "handle på butikken".includes(title.toLowerCase());
 
   const suggestions = showShoppingSuggestion
     ? [SHOPPING_TASK as (typeof routines[0] & { id: string }), ...routineSuggestions.filter((r) => r.title.toLowerCase() !== "handle på butikken")]
@@ -44,13 +37,10 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
   function applySuggestion(r: typeof routines[0]) {
     setTitle(r.title);
-    if (r.defaultDurationMinutes) { setHasDuration(true); setDurationStr(String(r.defaultDurationMinutes)); }
     if (r.projectId) setProjectId(r.projectId);
     setShowSuggestions(false);
     inputRef.current?.focus();
   }
-
-  const durationMinutes = hasDuration ? Math.max(1, parseInt(durationStr) || 1) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,7 +53,7 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
       category: "private",
       lane: "afterwork",
       customer: null,
-      durationMinutes,
+      durationMinutes: null,
       isBacklog,
       projectId: projectId || null,
       dueDate: isBacklog ? null : targetDate,
@@ -71,7 +61,7 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
       completedAt: null,
     });
     if (isRecurring && !routines.find((r) => r.title.toLowerCase() === trimmed.toLowerCase())) {
-      addRoutine({ title: trimmed, projectId: projectId || null, defaultDurationMinutes: durationMinutes, description: null });
+      addRoutine({ title: trimmed, projectId: projectId || null, defaultDurationMinutes: null, description: null });
     }
     setTitle("");
     setIsBacklog(false);
@@ -113,9 +103,6 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
                 className="w-full px-3 py-2.5 text-left hover:bg-white/5 flex items-center gap-2 transition-colors">
                 <span className="text-accent text-xs shrink-0">{r.id === "__shopping__" ? "🛒" : "⟳"}</span>
                 <span className="flex-1 text-textPrimary text-sm">{r.title}</span>
-                {r.defaultDurationMinutes && (
-                  <span className="text-textMuted text-xs shrink-0">{formatDuration(r.defaultDurationMinutes)}</span>
-                )}
               </button>
             ))}
           </div>
@@ -134,44 +121,6 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
             {backlog ? "Backlog" : dateLabel}
           </button>
         ))}
-      </div>
-
-      {/* Duration */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-textMuted">Duration</span>
-          <button type="button" onClick={() => setHasDuration((h) => !h)}
-            className={`text-xs px-2 py-0.5 rounded-full transition-colors ${
-              hasDuration ? "bg-accent/20 text-accent" : "text-textMuted border border-border"
-            }`}>
-            {hasDuration ? "set" : "none"}
-          </button>
-        </div>
-        {hasDuration && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                value={durationStr}
-                onChange={(e) => setDurationStr(e.target.value)}
-                className="input-base text-sm text-center"
-                style={{ padding: "8px 10px" }}
-              />
-              <span className="text-sm text-textMuted shrink-0">min</span>
-            </div>
-            <div className="flex gap-1 flex-wrap">
-              {DURATION_QUICK.map((p) => (
-                <button key={p} type="button" onClick={() => setDurationStr(String(p))}
-                  className={`text-xs px-2 py-1 rounded transition-colors ${
-                    durationStr === String(p) ? "bg-accent/20 text-accent" : "text-textMuted hover:text-textSecondary"
-                  }`}>
-                  {p < 60 ? `${p}m` : `${p / 60}h`}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Project */}
@@ -205,24 +154,6 @@ function InlineAddForm({ targetDate, onAdded }: { targetDate: string; onAdded?: 
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PlannerPage() {
-  const router = useRouter();
-
-  // Time-based routing: redirect once per session on first open
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem("time-routed")) return;
-      const h = new Date().getHours();
-      if (h >= 6 && h < 9) {
-        sessionStorage.setItem("time-routed", "1");
-        router.replace("/morning");
-      } else if (h >= 21 || h < 2) {
-        sessionStorage.setItem("time-routed", "1");
-        router.replace("/end-of-day");
-      }
-    } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const tasks = useStore((s) => s.tasks);
   const projects = useStore((s) => s.projects);
   const selectedDate = useStore((s) => s.selectedDate);
@@ -231,13 +162,18 @@ export default function PlannerPage() {
   const moveToToday = useStore((s) => s.moveToToday);
   const reorderTasks = useStore((s) => s.reorderTasks);
   const deleteTask = useStore((s) => s.deleteTask);
-
   const updateTask = useStore((s) => s.updateTask);
+
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+
+  // Edit state for day tasks
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editDur, setEditDur] = useState("");
+
+  // Edit state for backlog tasks
+  const [editingBacklogId, setEditingBacklogId] = useState<string | null>(null);
+  const [editBacklogTitle, setEditBacklogTitle] = useState("");
 
   const today = todayISO();
   const isToday = selectedDate === today;
@@ -263,7 +199,6 @@ export default function PlannerPage() {
   const done = rawTasks.filter((t) => t.status === "completed").length;
   const total = rawTasks.length;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const minutesLeft = rawTasks.filter((t) => t.status === "pending").reduce((s, t) => s + (t.durationMinutes ?? 0), 0);
 
   function getProjectColor(projectId: string | null) {
     return projectId ? projects.find((p) => p.id === projectId)?.color ?? null : null;
@@ -300,9 +235,10 @@ export default function PlannerPage() {
 
       <div className="w-[90%] max-w-[1100px] mx-auto pb-6 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
 
-        {/* ── Left: task list ── */}
-        <div className="flex flex-col min-w-0">
-          {/* DateNav + progress */}
+        {/* ── Left column: tasks + backlog ── */}
+        <div className="flex flex-col gap-6 min-w-0">
+
+          {/* Day tasks */}
           <div>
             <DateNav />
             {total > 0 && (
@@ -313,10 +249,7 @@ export default function PlannerPage() {
                 <span className="text-sm text-textMuted shrink-0">{done}/{total}</span>
               </div>
             )}
-          </div>
 
-          {/* Task list */}
-          <div className="pr-1">
             {displayTasks.length === 0 ? (
               <div className="py-10 text-center">
                 <p className="text-textMuted">
@@ -334,10 +267,7 @@ export default function PlannerPage() {
                         onSubmit={async (e) => {
                           e.preventDefault();
                           if (!editTitle.trim()) return;
-                          await updateTask(task.id, {
-                            title: editTitle.trim(),
-                            durationMinutes: editDur !== "" ? Number(editDur) : null,
-                          });
+                          await updateTask(task.id, { title: editTitle.trim() });
                           setEditingId(null);
                         }}
                         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-surfaceElevated border border-accent/30"
@@ -349,77 +279,47 @@ export default function PlannerPage() {
                           autoFocus
                           onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
                         />
-                        <div className="flex items-center gap-1 shrink-0">
-                          <input
-                            type="number"
-                            value={editDur}
-                            onChange={(e) => setEditDur(e.target.value)}
-                            placeholder="–"
-                            className="w-12 bg-background border border-border rounded px-2 py-1 text-xs text-textPrimary focus:outline-none focus:border-accent text-center"
-                            min={1}
-                          />
-                          <span className="text-xs text-textMuted">m</span>
-                        </div>
                         <button type="submit" className="text-accent text-sm px-2 py-1 rounded hover:bg-accent/10 transition-colors">✓</button>
                         <button type="button" onClick={() => setEditingId(null)} className="text-textMuted text-sm px-2 py-1 rounded hover:bg-white/5 transition-colors">✕</button>
                       </form>
                     );
                   }
                   return (
-                    <div className={`task-row flex items-center gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
+                    <div className={`task-row flex items-start gap-3 px-3 py-3 rounded-xl group${completingIds.has(task.id) ? " task-completing" : ""}`}>
                       <Checkbox checked={task.status === "completed"} onChange={() => handleToggle(task.id)} size={18} />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 min-w-0">
+                        <div className="flex items-start gap-2 min-w-0">
                           {getProjectColor(task.projectId) && (
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: getProjectColor(task.projectId)! }} />
+                            <span className="w-2 h-2 rounded-full shrink-0 mt-1.5" style={{ background: getProjectColor(task.projectId)! }} />
                           )}
-                          <span className={`text-base truncate ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
+                          <span className={`text-base break-words ${task.status === "completed" ? "line-through text-textMuted" : "text-textPrimary"}`}>
                             {task.title}
                           </span>
                         </div>
-                        {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate pl-4">{task.notes}</p>}
+                        {task.notes && <p className="text-xs text-textMuted mt-0.5 break-words pl-4">{task.notes}</p>}
                       </div>
-                      {task.durationMinutes != null && (
-                        <span className="text-sm text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
-                      )}
-                      <button
-                        onClick={() => { setEditingId(task.id); setEditTitle(task.title); setEditDur(task.durationMinutes != null ? String(task.durationMinutes) : ""); }}
-                        className="text-textMuted hover:text-textSecondary transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
-                        title="Edit"
-                      >
-                        ✎
-                      </button>
-                      <button onClick={() => moveToBacklog(task.id)}
-                        className="hidden md:block text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5 shrink-0">
-                        ← backlog
-                      </button>
-                      <button onClick={() => deleteTask(task.id)}
-                        className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
-                        ✕
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setEditingId(task.id); setEditTitle(task.title); }}
+                          className="text-textMuted hover:text-textSecondary transition-colors text-sm px-1"
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                        <button onClick={() => moveToBacklog(task.id)}
+                          className="hidden md:block text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5">
+                          ← backlog
+                        </button>
+                        <button onClick={() => deleteTask(task.id)}
+                          className="text-textMuted hover:text-red-400 transition-colors text-sm px-1">
+                          ✕
+                        </button>
+                      </div>
                     </div>
                   );
                 }}
               />
             )}
-          </div>
-
-          {/* Time remaining */}
-          {minutesLeft > 0 && (
-            <div className="pt-3 mt-1">
-              <p className="text-xs text-textMuted">
-                <span className="text-textPrimary font-semibold">{formatDuration(minutesLeft)}</span> remaining
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* ── Right: add form + backlog — sticky so position never changes ── */}
-        <div className="md:sticky md:top-6 space-y-6 pb-4">
-          {/* Add form */}
-          <div className="bg-surface rounded-xl border border-border p-5">
-            <h2 className="section-label mb-4">New task</h2>
-            <InlineAddForm targetDate={selectedDate} />
           </div>
 
           {/* Backlog */}
@@ -431,29 +331,70 @@ export default function PlannerPage() {
               <p className="text-sm text-textMuted py-4 text-center">Backlog is empty</p>
             ) : (
               <div className="space-y-1">
-                {backlogTasks.map((task) => (
-                  <div key={task.id} className="task-row flex items-center gap-2 px-2 py-2.5 rounded-lg group">
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm text-textSecondary">{task.title}</span>
-                      {task.notes && <p className="text-xs text-textMuted mt-0.5 truncate">{task.notes}</p>}
+                {backlogTasks.map((task) => {
+                  if (editingBacklogId === task.id) {
+                    return (
+                      <form
+                        key={task.id}
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!editBacklogTitle.trim()) return;
+                          await updateTask(task.id, { title: editBacklogTitle.trim() });
+                          setEditingBacklogId(null);
+                        }}
+                        className="flex items-center gap-2 px-2 py-2 rounded-lg bg-surfaceElevated border border-accent/30"
+                      >
+                        <input
+                          value={editBacklogTitle}
+                          onChange={(e) => setEditBacklogTitle(e.target.value)}
+                          className="flex-1 min-w-0 bg-transparent text-sm text-textPrimary focus:outline-none"
+                          autoFocus
+                          onKeyDown={(e) => e.key === "Escape" && setEditingBacklogId(null)}
+                        />
+                        <button type="submit" className="text-accent text-sm px-2 py-1 rounded hover:bg-accent/10 transition-colors">✓</button>
+                        <button type="button" onClick={() => setEditingBacklogId(null)} className="text-textMuted text-sm px-2 py-1 rounded hover:bg-white/5 transition-colors">✕</button>
+                      </form>
+                    );
+                  }
+                  return (
+                    <div key={task.id} className="task-row flex items-start gap-2 px-2 py-2.5 rounded-lg group">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm text-textSecondary break-words">{task.title}</span>
+                        {task.notes && <p className="text-xs text-textMuted mt-0.5 break-words">{task.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setEditingBacklogId(task.id); setEditBacklogTitle(task.title); }}
+                          className="text-textMuted hover:text-textSecondary transition-colors text-sm px-1"
+                          title="Edit"
+                        >
+                          ✎
+                        </button>
+                        <button onClick={() => handleMoveToDate(task.id)}
+                          className="text-xs text-accent hover:text-accentLight font-medium transition-colors px-2 py-1 rounded hover:bg-accent/10">
+                          → {isToday ? "today" : "this day"}
+                        </button>
+                        <button onClick={() => deleteTask(task.id)}
+                          className="text-textMuted hover:text-red-400 transition-colors text-sm px-1">
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                    {task.durationMinutes != null && (
-                      <span className="text-xs text-textMuted shrink-0">{formatDuration(task.durationMinutes)}</span>
-                    )}
-                    <button onClick={() => handleMoveToDate(task.id)}
-                      className="text-xs text-accent hover:text-accentLight font-medium transition-colors px-2 py-1 rounded hover:bg-accent/10 shrink-0">
-                      → {isToday ? "today" : "this day"}
-                    </button>
-                    <button onClick={() => deleteTask(task.id)}
-                      className="text-textMuted hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0">
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
+
+        {/* ── Right column: add form (sticky) ── */}
+        <div className="md:sticky md:top-6 pb-4">
+          <div className="bg-surface rounded-xl border border-border p-5">
+            <h2 className="section-label mb-4">New task</h2>
+            <InlineAddForm targetDate={selectedDate} />
+          </div>
+        </div>
+
       </div>
     </div>
   );

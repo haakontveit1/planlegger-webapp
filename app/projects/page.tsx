@@ -162,43 +162,45 @@ export default function ProjectsPage() {
                   const pending = taskCountForProject(project.id);
                   const noteOpen = expandedNoteId === project.id;
                   return (
-                    <div key={project.id} className="relative group">
-                      <Link href={`/projects/${project.id}`}
-                        className={`block bg-surface border border-border px-6 py-5 flex items-center gap-4 hover:border-opacity-60 transition-colors ${noteOpen ? "rounded-t-xl" : "rounded-xl"}`}
-                        style={{ borderLeft: `5px solid ${project.color}` }}>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-lg font-semibold text-textPrimary">{project.name}</p>
-                          <p className="text-sm text-textMuted mt-0.5">
-                            {pending > 0 ? `${pending} pending task${pending !== 1 ? "s" : ""}` : "No open tasks"}
-                          </p>
+                    <div key={project.id}>
+                      {/* Link card row with action buttons — separate relative container so top-1/2 always centers on the card */}
+                      <div className="relative group">
+                        <Link href={`/projects/${project.id}`}
+                          className={`block bg-surface border border-border px-6 py-5 flex items-center gap-4 hover:border-opacity-60 transition-colors ${noteOpen ? "rounded-t-xl" : "rounded-xl"}`}
+                          style={{ borderLeft: `5px solid ${project.color}` }}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-lg font-semibold text-textPrimary">{project.name}</p>
+                            <p className="text-sm text-textMuted mt-0.5">
+                              {pending > 0 ? `${pending} pending task${pending !== 1 ? "s" : ""}` : "No open tasks"}
+                            </p>
+                          </div>
+                          <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-20">›</span>
+                        </Link>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => { e.preventDefault(); setExpandedNoteId(noteOpen ? null : project.id); }}
+                            className={`transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5 ${
+                              noteOpen ? "text-accent" : "text-textMuted hover:text-textSecondary"
+                            }`}
+                            title="Add note"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (confirm(`Delete project "${project.name}"? Tasks will be unlinked.`)) {
+                                deleteProject(project.id);
+                              }
+                            }}
+                            className="text-textMuted hover:text-danger transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5"
+                            title="Delete"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <span className="text-xl text-textMuted group-hover:text-textSecondary transition-colors mr-20">›</span>
-                      </Link>
-                      {/* Action buttons */}
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => { e.preventDefault(); setExpandedNoteId(noteOpen ? null : project.id); }}
-                          className={`transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5 ${
-                            noteOpen ? "text-accent" : "text-textMuted hover:text-textSecondary"
-                          }`}
-                          title="Add note"
-                        >
-                          ✎
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (confirm(`Delete project "${project.name}"? Tasks will be unlinked.`)) {
-                              deleteProject(project.id);
-                            }
-                          }}
-                          className="text-textMuted hover:text-danger transition-colors text-sm px-2 py-1.5 rounded hover:bg-white/5"
-                          title="Delete"
-                        >
-                          ✕
-                        </button>
                       </div>
-                      {/* Inline note form */}
+                      {/* Inline note form outside the relative card — avoids top-1/2 drift */}
                       {noteOpen && (
                         <InlineNoteForm project={project} onClose={() => setExpandedNoteId(null)} />
                       )}
