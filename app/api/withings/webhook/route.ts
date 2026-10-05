@@ -97,14 +97,14 @@ export async function POST(req: Request) {
 
   const measureData = await measureRes.json() as {
     status: number;
-    body: { measuregroups: Array<{ date: number; measures: Array<{ type: number; value: number; unit: number }> }> };
+    body: { measuregrps: Array<{ date: number; measures: Array<{ type: number; value: number; unit: number }> }> };
   };
 
   if (measureData.status !== 0) {
     return NextResponse.json({ ok: false });
   }
 
-  for (const group of measureData.body?.measuregroups ?? []) {
+  for (const group of measureData.body?.measuregrps ?? []) {
     const dateStr = toDateStr(group.date);
     for (const measure of group.measures) {
       if (!MEAS_TYPES.has(measure.type)) continue;

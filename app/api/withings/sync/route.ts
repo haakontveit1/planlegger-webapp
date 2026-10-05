@@ -77,17 +77,14 @@ export async function POST(req: Request) {
 
   const measureData = await measureRes.json() as {
     status: number;
-    body: { measuregroups: Array<{ date: number; measures: Array<{ type: number; value: number; unit: number }> }> };
+    body: { measuregrps: Array<{ date: number; measures: Array<{ type: number; value: number; unit: number }> }> };
   };
 
   if (measureData.status !== 0) {
-    return NextResponse.json({
-      error: `Withings API error (status ${measureData.status})`,
-      raw: measureData,
-    }, { status: 500 });
+    return NextResponse.json({ error: `Withings API error (status ${measureData.status})` }, { status: 500 });
   }
 
-  const groups = measureData.body?.measuregroups ?? [];
+  const groups = measureData.body?.measuregrps ?? [];
   let count = 0;
   for (const group of groups) {
     const dateStr = toDateStr(group.date);
@@ -110,14 +107,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    count,
-    debug: {
-      groupCount: groups.length,
-      startdate,
-      enddate,
-      rawBody: measureData.body,
-    },
-  });
+  return NextResponse.json({ ok: true, count });
 }
