@@ -19,6 +19,12 @@ const navGroups: { label: string | null; items: { href: string; label: string; i
     ],
   },
   {
+    label: "Økonomi",
+    items: [
+      { href: "/economy", label: "Privat Økonomi", icon: "◈" },
+    ],
+  },
+  {
     label: "Stats",
     items: [
       { href: "/stats",    label: "Garmin",          icon: "▦" },
