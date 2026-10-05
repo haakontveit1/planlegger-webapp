@@ -25,7 +25,7 @@ export default function HandelistePage() {
       id: newId(),
       text: input.trim(),
       checked: false,
-      sortOrder: Date.now(),
+      sortOrder: Math.floor(Date.now() / 1000),
       createdAt: now(),
     };
     setInput("");
