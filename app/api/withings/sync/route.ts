@@ -66,18 +66,13 @@ export async function POST(req: Request) {
     )
   `;
 
-  const measureRes = await fetch("https://wbsapi.withings.net/measure", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: new URLSearchParams({
-      action: "getmeas",
-      category: "1",
-      startdate: String(startdate),
-      enddate: String(enddate),
-    }),
+  const measureUrl = new URL("https://wbsapi.withings.net/measure");
+  measureUrl.searchParams.set("action", "getmeas");
+  measureUrl.searchParams.set("startdate", String(startdate));
+  measureUrl.searchParams.set("enddate", String(enddate));
+
+  const measureRes = await fetch(measureUrl.toString(), {
+    headers: { "Authorization": `Bearer ${token}` },
   });
 
   const measureData = await measureRes.json() as {
@@ -122,7 +117,7 @@ export async function POST(req: Request) {
       groupCount: groups.length,
       startdate,
       enddate,
-      sample: groups.slice(0, 2),
+      rawBody: measureData.body,
     },
   });
 }
