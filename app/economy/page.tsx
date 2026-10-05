@@ -56,6 +56,12 @@ export default function EconomyPage() {
   const [catColor,         setCatColor]         = useState(PALETTE[0]);
   const [catSaving,        setCatSaving]        = useState(false);
 
+  // Edit category
+  const [editingCatId,  setEditingCatId]  = useState<string | null>(null);
+  const [editCatName,   setEditCatName]   = useState("");
+  const [editCatColor,  setEditCatColor]  = useState(PALETTE[0]);
+  const [editCatSaving, setEditCatSaving] = useState(false);
+
   useEffect(() => {
     Promise.all([
       fetch("/api/economy/categories").then(r => r.json()),
@@ -152,6 +158,31 @@ export default function EconomyPage() {
   async function deleteCategory(id: string) {
     await fetch(`/api/economy/categories?id=${id}`, { method: "DELETE" });
     setCategories(prev => prev.filter(c => c.id !== id));
+    if (editingCatId === id) setEditingCatId(null);
+  }
+
+  function startEditCategory(cat: Category) {
+    setEditingCatId(cat.id);
+    setEditCatName(cat.name);
+    setEditCatColor(cat.color);
+  }
+
+  async function handleSaveCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCatId || !editCatName.trim()) return;
+    setEditCatSaving(true);
+    try {
+      await fetch("/api/economy/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingCatId, name: editCatName.trim(), color: editCatColor }),
+      });
+      setCategories(prev => prev.map(c =>
+        c.id === editingCatId ? { ...c, name: editCatName.trim(), color: editCatColor } : c
+      ));
+      setEditingCatId(null);
+    } catch {}
+    setEditCatSaving(false);
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -391,20 +422,77 @@ export default function EconomyPage() {
           {categories.length > 0 && (
             <section className="bg-surface rounded-xl border border-border p-5">
               <h2 className="text-sm font-semibold text-textPrimary mb-3">Kategorier</h2>
-              <div className="flex flex-wrap gap-2">
-                {categories.map(cat => (
-                  <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surfaceElevated group">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.color }} />
-                    <span className="text-sm text-textSecondary">{cat.name}</span>
-                    <button
-                      onClick={() => deleteCategory(cat.id)}
-                      className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-xs ml-1"
-                      title="Slett kategori"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+              <div className="space-y-1">
+                {categories.map(cat => {
+                  const isEditing = editingCatId === cat.id;
+                  if (isEditing) {
+                    return (
+                      <form
+                        key={cat.id}
+                        onSubmit={handleSaveCategory}
+                        className="p-3 bg-surfaceElevated rounded-xl border border-accent/30 space-y-3"
+                      >
+                        <input
+                          type="text"
+                          value={editCatName}
+                          onChange={e => setEditCatName(e.target.value)}
+                          className="input-base text-sm"
+                          autoFocus
+                          required
+                        />
+                        <div className="flex gap-2 flex-wrap">
+                          {PALETTE.map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setEditCatColor(c)}
+                              className="w-6 h-6 rounded-full transition-transform hover:scale-110 shrink-0"
+                              style={{ background: c, outline: editCatColor === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={!editCatName.trim() || editCatSaving}
+                            className="px-3 py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
+                          >
+                            {editCatSaving ? "Lagrer…" : "Lagre"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatId(null)}
+                            className="px-3 py-1.5 rounded-lg text-textMuted text-xs hover:text-textSecondary transition-colors"
+                          >
+                            Avbryt
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+                  return (
+                    <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-border hover:bg-white/5 group transition-colors">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
+                      <span className="flex-1 text-sm text-textPrimary">{cat.name}</span>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => startEditCategory(cat)}
+                          className="text-textMuted hover:text-accent transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+                          title="Rediger"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(cat.id)}
+                          className="text-textMuted hover:text-danger transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+                          title="Slett"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
