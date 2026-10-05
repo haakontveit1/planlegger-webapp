@@ -168,7 +168,7 @@ function extractSessions(csvText: string): LiftSession[] {
 // ── Chart computation ─────────────────────────────────────────────────────────
 
 interface ChartResult {
-  points: { date: string; actual: number | null; proj: number | null }[];
+  points: { date: string; actual: number | null; proj: number | null; bestWeight?: number; bestReps?: number }[];
   projectedDate: Date | null;
   latestOrm: number | null;
 }
@@ -198,12 +198,13 @@ function buildChart(sessions: LiftSession[], ex: string, repType: "low" | "high"
     }
   }
 
-  const points: { date: string; actual: number | null; proj: number | null }[] =
-    filtered.map((s, i) => ({
-      date:   fmtDate(s.date),
-      actual: s.estimated1rm as number | null,
-      proj:   (i === filtered.length - 1 && projectedDate ? s.estimated1rm : null) as number | null,
-    }));
+  const points: ChartResult["points"] = filtered.map((s, i) => ({
+    date:      fmtDate(s.date),
+    actual:    s.estimated1rm as number | null,
+    proj:      (i === filtered.length - 1 && projectedDate ? s.estimated1rm : null) as number | null,
+    bestWeight: s.bestWeight,
+    bestReps:   s.bestReps,
+  }));
 
   if (projectedDate && filtered.length >= 2) {
     const lastDate = new Date(filtered[filtered.length - 1].date + "T00:00:00");
@@ -242,6 +243,30 @@ function EmptyChart({ msg }: { msg: string }) {
   return (
     <div className="h-40 flex items-center justify-center rounded-lg bg-background border border-border">
       <p className="text-xs text-textMuted">{msg}</p>
+    </div>
+  );
+}
+
+function LiftTooltip(props: { active?: boolean; payload?: any[]; label?: string }) {
+  const { active, payload, label } = props;
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ ...CS.tooltip, padding: "8px 12px" }}>
+      <p style={{ color: "#9ca3af", fontSize: 11, marginBottom: 4 }}>{label}</p>
+      {payload.map((entry: any) => {
+        if (entry.value == null) return null;
+        const isActual = entry.name === "actual";
+        return (
+          <p key={entry.name} style={{ color: entry.color, margin: "2px 0", fontSize: 12 }}>
+            {isActual ? "1RM" : "Projeksjon"}: {entry.value} kg
+            {isActual && entry.payload.bestWeight != null && entry.payload.bestReps != null && (
+              <span style={{ color: "#9ca3af", fontSize: 10 }}>
+                {" "}({entry.payload.bestWeight} kg × {entry.payload.bestReps})
+              </span>
+            )}
+          </p>
+        );
+      })}
     </div>
   );
 }
@@ -369,11 +394,7 @@ export default function WorkoutPage() {
                             domain={["auto", (max: number) => Math.max(Math.ceil(max * 1.04), lift.goal + 5)]}
                             tick={{ fill: CS.axis, fontSize: 10 }} tickLine={false} axisLine={false} width={40} unit="kg"
                           />
-                          <Tooltip
-                            contentStyle={CS.tooltip}
-                            labelStyle={{ color: "#e5e7eb" }}
-                            formatter={(v, name) => [`${v} kg`, name === "actual" ? "1RM (estimert)" : "Projeksjon"]}
-                          />
+                          <Tooltip content={<LiftTooltip />} />
                           <ReferenceLine y={lift.goal} stroke={lift.color} strokeDasharray="4 4" strokeOpacity={0.35} />
                           <Line type="monotone" dataKey="actual" stroke={lift.color} strokeWidth={2} dot={{ r: 3, fill: lift.color }} activeDot={{ r: 5 }} connectNulls />
                           <Line type="monotone" dataKey="proj"   stroke={lift.color} strokeWidth={1.5} strokeDasharray="5 5" dot={false} connectNulls opacity={0.55} />

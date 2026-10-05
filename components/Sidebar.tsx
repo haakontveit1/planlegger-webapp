@@ -22,7 +22,7 @@ const navGroups: { label: string | null; items: { href: string; label: string; i
     label: "Stats",
     items: [
       { href: "/stats",    label: "Garmin",          icon: "▦" },
-      { href: "/withings", label: "Withings",        icon: "◈" },
+      { href: "/withings", label: "Weight Tracking",  icon: "◈" },
       { href: "/workout",  label: "Treningsstyrke",  icon: "▣" },
     ],
   },

@@ -1,12 +1,11 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
 
-interface WeightLog { date: string; weightKg: number }
 interface GarminDay {
   date: string;
   steps: number | null;
@@ -69,120 +68,20 @@ function lastNDays(n: number): string[] {
   return days;
 }
 
-type WeightGoal =
-  | { type: "target-date"; targetDate: string; targetWeight: number }
-  | { type: "rate"; rateKgPerWeek: number; startDate: string; startWeight: number };
-
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function computeGoalLine(
-  logs: WeightLog[],
-  goal: WeightGoal
-): { date: string; goal: number }[] {
-  if (logs.length === 0) return [];
-  const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date));
-  const result: { date: string; goal: number }[] = [];
-
-  if (goal.type === "target-date") {
-    const latest = sorted[sorted.length - 1];
-    const latestDate = new Date(latest.date + "T00:00:00");
-    const endDate = new Date(goal.targetDate + "T00:00:00");
-    const totalMs = endDate.getTime() - latestDate.getTime();
-    const cur = new Date(sorted[0].date + "T00:00:00");
-    while (cur <= endDate) {
-      const frac = totalMs > 0 ? (cur.getTime() - latestDate.getTime()) / totalMs : 0;
-      result.push({ date: localDateStr(cur), goal: Math.round((latest.weightKg + (goal.targetWeight - latest.weightKg) * frac) * 10) / 10 });
-      cur.setDate(cur.getDate() + 1);
-    }
-  } else {
-    const { rateKgPerWeek, startDate, startWeight } = goal;
-    if (!startDate || isNaN(startWeight) || isNaN(rateKgPerWeek)) return [];
-    const ratePerDay = rateKgPerWeek / 7;
-    const goalStart = new Date(startDate + "T00:00:00");
-    const end = new Date(); end.setDate(end.getDate() + 90);
-    const cur = new Date(goalStart);
-    while (cur <= end) {
-      const days = (cur.getTime() - goalStart.getTime()) / 86400000;
-      const goalVal = Math.round((startWeight + ratePerDay * days) * 100) / 100;
-      if (!isNaN(goalVal)) result.push({ date: localDateStr(cur), goal: goalVal });
-      cur.setDate(cur.getDate() + 1);
-    }
-  }
-  return result;
-}
-
 function numAvg(vals: (number | null)[]): number | null {
   const v = vals.filter(x => x != null) as number[];
   return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null;
 }
 
 export default function StatsPage() {
-  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [garminData, setGarminData] = useState<GarminDay[]>([]);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "done" | "error" | "no-creds">("idle");
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [missingDays, setMissingDays] = useState<string[]>([]);
   const [backfilling, setBackfilling] = useState(false);
-
-  // Weight goal
-  const [weightGoal, setWeightGoal] = useState<WeightGoal | null>(null);
-  const [goalType, setGoalType] = useState<"target-date" | "rate">("target-date");
-  const [goalTargetDate, setGoalTargetDate] = useState("");
-  const [goalTargetWeight, setGoalTargetWeight] = useState("");
-  const [goalRate, setGoalRate] = useState("");
-  const [goalPeriod, setGoalPeriod] = useState<"week" | "month">("week");
-  const [goalStartDate, setGoalStartDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [goalStartWeight, setGoalStartWeight] = useState("");
-  const [showGoalForm, setShowGoalForm] = useState(false);
-
-  // Manual weight input
-  const [weightInput, setWeightInput] = useState("");
-  const [weightDateInput, setWeightDateInput] = useState(() => localDateStr(new Date()));
-  const [weightSaving, setWeightSaving] = useState(false);
-
-  async function handleLogWeight(e: React.FormEvent) {
-    e.preventDefault();
-    const kg = parseFloat(weightInput);
-    if (isNaN(kg) || !weightDateInput) return;
-    setWeightSaving(true);
-    try {
-      await fetch("/api/weight-logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: weightDateInput, weightKg: kg }),
-      });
-      const updated = await fetch("/api/weight-logs").then(r => r.json());
-      setWeightLogs(updated);
-      setWeightInput("");
-    } catch {}
-    setWeightSaving(false);
-  }
-
-  // Garmin range
   const [garminRange, setGarminRange] = useState<7 | 14 | 30 | 60>(14);
 
   useEffect(() => {
-    // Load saved weight goal
-    try {
-      const g = localStorage.getItem("weight_goal");
-      if (g) {
-        const parsed = JSON.parse(g) as WeightGoal;
-        setWeightGoal(parsed);
-        setGoalType(parsed.type);
-        if (parsed.type === "target-date") {
-          setGoalTargetDate(parsed.targetDate);
-          setGoalTargetWeight(String(parsed.targetWeight));
-        } else {
-          setGoalRate(String(parsed.rateKgPerWeek));
-          setGoalStartDate(parsed.startDate);
-          setGoalStartWeight(String(parsed.startWeight));
-        }
-      }
-    } catch {}
-
-    fetch("/api/weight-logs").then(r => r.json()).then(setWeightLogs).catch(() => {});
     loadGarminData().then((data) => {
       setGarminData(data);
       if (data.length > 0) setLastSynced(data[0].date);
@@ -232,37 +131,6 @@ export default function StatsPage() {
 
   const isFirstRun = syncStatus === "done" && garminData.length === 0;
 
-  function saveGoal(e: React.FormEvent) {
-    e.preventDefault();
-    let goal: WeightGoal | null = null;
-    if (goalType === "target-date") {
-      if (!goalTargetDate || !goalTargetWeight) return;
-      goal = { type: "target-date", targetDate: goalTargetDate, targetWeight: parseFloat(goalTargetWeight) };
-    } else {
-      if (!goalRate || !goalStartDate || !goalStartWeight) return;
-      const rateVal = parseFloat(goalRate);
-      // Convert to kg/week regardless of chosen period
-      const rateKgPerWeek = goalPeriod === "month" ? rateVal / 4.33 : rateVal;
-      goal = { type: "rate", rateKgPerWeek, startDate: goalStartDate, startWeight: parseFloat(goalStartWeight) };
-    }
-    try { localStorage.setItem("weight_goal", JSON.stringify(goal)); } catch {}
-    setWeightGoal(goal);
-    setShowGoalForm(false);
-  }
-
-  // Chart is driven entirely by logged dates — goal line is just an overlay
-  const weightChartData = useMemo(() => {
-    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
-    const goalLine = weightGoal ? computeGoalLine(weightLogs, weightGoal) : [];
-    const goalMap = new Map(goalLine.map(g => [g.date, g.goal]));
-
-    return sorted.map(w => ({
-      date: fmtDate(w.date),
-      weight: w.weightKg,
-      goal: goalMap.get(w.date) ?? null,
-    }));
-  }, [weightLogs, weightGoal]);
-
   const garminChartData = [...garminData]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-garminRange)
@@ -276,11 +144,11 @@ export default function StatsPage() {
       restingHr: d.restingHr,
     }));
 
-  const stepsAvg    = numAvg(garminChartData.map(d => d.steps));
-  const sleepAvg    = numAvg(garminChartData.map(d => d.sleepHours));
-  const scoreAvg    = numAvg(garminChartData.map(d => d.sleepScore));
-  const batteryAvg  = numAvg(garminChartData.map(d => d.batteryWakeup));
-  const hrAvg       = numAvg(garminChartData.map(d => d.restingHr));
+  const stepsAvg   = numAvg(garminChartData.map(d => d.steps));
+  const sleepAvg   = numAvg(garminChartData.map(d => d.sleepHours));
+  const scoreAvg   = numAvg(garminChartData.map(d => d.sleepScore));
+  const batteryAvg = numAvg(garminChartData.map(d => d.batteryWakeup));
+  const hrAvg      = numAvg(garminChartData.map(d => d.restingHr));
 
   const garminConfigured = syncStatus !== "no-creds";
 
@@ -291,163 +159,6 @@ export default function StatsPage() {
         <p className="text-sm text-textMuted mt-1">Helse og aktivitet over tid</p>
       </div>
 
-      {/* ── Weight ── */}
-      <section className="bg-surface rounded-xl border border-border p-6">
-        <div className="flex items-start justify-between mb-4">
-          <SectionHeader
-            title="Vekt"
-            sub={weightLogs.length > 0 ? `${weightLogs.length} målinger logget` : undefined}
-          />
-          <button
-            onClick={() => setShowGoalForm((v) => !v)}
-            className="text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded border border-border hover:border-accent/50 shrink-0"
-          >
-            {weightGoal ? "Rediger mål" : "Sett mål"}
-          </button>
-        </div>
-
-        {/* Goal form */}
-        {showGoalForm && (
-          <form onSubmit={saveGoal} className="mb-5 p-4 bg-surfaceElevated rounded-xl border border-border space-y-3">
-            <div className="flex gap-3">
-              <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
-                <input type="radio" checked={goalType === "target-date"} onChange={() => setGoalType("target-date")} className="accent-amber-400" />
-                Dato-mål
-              </label>
-              <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
-                <input type="radio" checked={goalType === "rate"} onChange={() => setGoalType("rate")} className="accent-amber-400" />
-                Fast rate
-              </label>
-            </div>
-            {goalType === "target-date" ? (
-              <div className="flex items-center gap-3 flex-wrap">
-                <input type="date" value={goalTargetDate} onChange={(e) => setGoalTargetDate(e.target.value)} className="input-base text-sm" required />
-                <div className="flex items-center gap-1.5">
-                  <input type="number" step="0.1" value={goalTargetWeight} onChange={(e) => setGoalTargetWeight(e.target.value)} placeholder="Målvekt" className="input-base text-sm w-24" required />
-                  <span className="text-sm text-textMuted">kg</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <input type="number" step="0.01" value={goalRate} onChange={e => setGoalRate(e.target.value)} placeholder="f.eks. -0.5" className="input-base text-sm w-28" required />
-                  <div className="flex gap-3">
-                    <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
-                      <input type="radio" checked={goalPeriod === "week"} onChange={() => setGoalPeriod("week")} className="accent-amber-400" />
-                      per uke
-                    </label>
-                    <label className="flex items-center gap-1.5 text-sm text-textSecondary cursor-pointer">
-                      <input type="radio" checked={goalPeriod === "month"} onChange={() => setGoalPeriod("month")} className="accent-amber-400" />
-                      per måned
-                    </label>
-                  </div>
-                  <span className="text-xs text-textMuted">kg (negativt = nedgang)</span>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div>
-                    <p className="text-xs text-textMuted mb-1">Startdato</p>
-                    <input type="date" value={goalStartDate} onChange={e => setGoalStartDate(e.target.value)} className="input-base text-sm" required />
-                  </div>
-                  <div>
-                    <p className="text-xs text-textMuted mb-1">Vekt på startdato</p>
-                    <div className="flex items-center gap-1.5">
-                      <input type="number" step="0.1" value={goalStartWeight} onChange={e => setGoalStartWeight(e.target.value)} placeholder="0.0" className="input-base text-sm w-24" required />
-                      <span className="text-sm text-textMuted">kg</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors">Lagre</button>
-              {weightGoal && (
-                <button type="button" onClick={() => { try { localStorage.removeItem("weight_goal"); } catch {} setWeightGoal(null); setShowGoalForm(false); }}
-                  className="px-4 py-1.5 rounded-lg text-textMuted text-sm hover:text-danger transition-colors">Fjern mål</button>
-              )}
-            </div>
-          </form>
-        )}
-
-        {weightChartData.filter(d => d.weight != null).length === 0 ? (
-          <EmptyChart message="Ingen vektmålinger ennå — bruk skjemaet nedenfor" />
-        ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={weightChartData} margin={{ left: -10, right: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_STYLE.grid} vertical={false} />
-              <XAxis dataKey="date" tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: CHART_STYLE.axis, fontSize: 11 }} tickLine={false} axisLine={false} width={60} unit=" kg" />
-              <Tooltip
-                contentStyle={CHART_STYLE.tooltip}
-                labelStyle={{ color: "#e5e7eb" }}
-                formatter={(v, name) => [`${v} kg`, name === "weight" ? "Vekt" : "Mål"]}
-              />
-              <Line type="monotone" dataKey="weight" stroke="#F59E0B" strokeWidth={2} dot={{ r: 3, fill: "#F59E0B" }} activeDot={{ r: 5 }} connectNulls />
-              {weightGoal && (
-                <Line type="monotone" dataKey="goal" stroke="#F59E0B" strokeWidth={1.5} strokeDasharray="5 5" dot={false} connectNulls opacity={0.5} />
-              )}
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-
-        {/* Active goal summary — below chart */}
-        {weightGoal && !showGoalForm && (
-          <div className="mt-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-accent/8 border border-accent/20 text-sm">
-            <span className="text-accent text-base leading-none">◎</span>
-            {weightGoal.type === "target-date" ? (
-              <span className="text-textSecondary">
-                Mål: <span className="text-textPrimary font-semibold">{weightGoal.targetWeight} kg</span>
-                {" "}innen{" "}
-                <span className="text-textPrimary font-semibold">
-                  {new Date(weightGoal.targetDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-              </span>
-            ) : (
-              <span className="text-textSecondary">
-                Rate:{" "}
-                <span className="text-textPrimary font-semibold">
-                  {weightGoal.rateKgPerWeek >= 0 ? "+" : ""}{weightGoal.rateKgPerWeek.toFixed(2)} kg/uke
-                </span>
-                {" · "}startdato{" "}
-                <span className="text-textPrimary font-semibold">
-                  {new Date(weightGoal.startDate + "T00:00:00").toLocaleDateString("no-NO", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-                {" · "}startvekt{" "}
-                <span className="text-textPrimary font-semibold">{weightGoal.startWeight} kg</span>
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Manual weight input */}
-        <form onSubmit={handleLogWeight} className="mt-4 flex items-center gap-2 flex-wrap">
-          <input
-            type="date"
-            value={weightDateInput}
-            onChange={e => setWeightDateInput(e.target.value)}
-            className="input-base text-sm"
-          />
-          <div className="flex items-center gap-1.5">
-            <input
-              type="number"
-              step="0.1"
-              value={weightInput}
-              onChange={e => setWeightInput(e.target.value)}
-              placeholder="f.eks. 82.5"
-              className="input-base text-sm w-28"
-            />
-            <span className="text-sm text-textMuted">kg</span>
-          </div>
-          <button
-            type="submit"
-            disabled={!weightInput || weightSaving}
-            className="px-4 py-2 rounded-xl bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
-          >
-            {weightSaving ? "Lagrer…" : "Logg vekt"}
-          </button>
-        </form>
-      </section>
-
-      {/* ── Garmin ── */}
       {!garminConfigured ? (
         <section className="bg-surface rounded-xl border border-border p-6">
           <SectionHeader title="Garmin" />
@@ -458,7 +169,6 @@ export default function StatsPage() {
         </section>
       ) : (
         <>
-          {/* Sync status + range selector */}
           <div className="flex items-center justify-between gap-4 px-1">
             <span className="text-xs text-textMuted">
               {syncStatus === "syncing" && "Synkroniserer med Garmin…"}
@@ -482,7 +192,6 @@ export default function StatsPage() {
             </div>
           </div>
 
-          {/* First-run: no data at all */}
           {isFirstRun && (
             <div className="flex items-center justify-between gap-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-5 py-4">
               <div>
@@ -499,7 +208,6 @@ export default function StatsPage() {
             </div>
           )}
 
-          {/* Gap notification: missing days between existing records */}
           {!isFirstRun && missingDays.length > 0 && (
             <div className="flex items-center justify-between gap-4 bg-amber-500/10 border border-amber-500/30 rounded-xl px-5 py-4">
               <div>
