@@ -86,11 +86,15 @@ export async function POST(req: Request) {
   };
 
   if (measureData.status !== 0) {
-    return NextResponse.json({ error: "Withings API error", status: measureData.status }, { status: 500 });
+    return NextResponse.json({
+      error: `Withings API error (status ${measureData.status})`,
+      raw: measureData,
+    }, { status: 500 });
   }
 
+  const groups = measureData.body?.measuregroups ?? [];
   let count = 0;
-  for (const group of measureData.body?.measuregroups ?? []) {
+  for (const group of groups) {
     const dateStr = toDateStr(group.date);
     for (const measure of group.measures) {
       if (!MEAS_TYPES.has(measure.type)) continue;
@@ -111,5 +115,14 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, count });
+  return NextResponse.json({
+    ok: true,
+    count,
+    debug: {
+      groupCount: groups.length,
+      startdate,
+      enddate,
+      sample: groups.slice(0, 2),
+    },
+  });
 }

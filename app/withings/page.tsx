@@ -240,9 +240,10 @@ export default function WeightTrackingPage() {
     setSyncMsg(null);
     try {
       const res = await fetch("/api/withings/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }) });
-      const data = await res.json() as { ok?: boolean; count?: number; error?: string };
+      const data = await res.json() as { ok?: boolean; count?: number; error?: string; debug?: { groupCount: number } };
       if (data.ok) {
-        setSyncMsg(`Synkronisert ${data.count ?? 0} målinger`);
+        const groups = data.debug?.groupCount ?? "?";
+        setSyncMsg(`${data.count ?? 0} målinger lagret (${groups} målegrupper funnet)`);
         await loadMeasurements();
         const updated = await fetch("/api/weight-logs").then(r => r.json()).catch(() => []);
         setWeightLogs(updated);
