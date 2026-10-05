@@ -501,7 +501,7 @@ export default function EconomyPage() {
                           <span className="text-sm font-semibold text-emerald-400">{fmtKr(item.amountPerMonth)}</span>
                           <button
                             onClick={() => deleteIncomeItem(item.id)}
-                            className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-xs px-1 shrink-0"
+                            className="text-textMuted hover:text-danger transition-colors text-xs px-1 shrink-0"
                             title="Slett"
                           >
                             ✕
@@ -526,7 +526,7 @@ export default function EconomyPage() {
                           <span className="text-sm font-semibold text-blue-400">{fmtKr(item.amountPerMonth)}</span>
                           <button
                             onClick={() => deleteIncomeItem(item.id)}
-                            className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-xs px-1 shrink-0"
+                            className="text-textMuted hover:text-danger transition-colors text-xs px-1 shrink-0"
                             title="Slett"
                           >
                             ✕
@@ -633,14 +633,14 @@ export default function EconomyPage() {
                     </div>
                     <div className="divide-y divide-border/30">
                       {[...g.items].sort((a, b) => b.amountPerMonth - a.amountPerMonth).map(exp => (
-                        <div key={exp.id} className="flex items-center gap-3 px-5 py-3 group">
+                        <div key={exp.id} className="flex items-center gap-3 px-5 py-3">
                           <span className="flex-1 text-sm text-textPrimary">{exp.name}</span>
                           <span className="text-sm font-semibold text-textPrimary">
                             {fmtKr(exp.amountPerMonth)}<span className="text-textMuted font-normal">/mnd</span>
                           </span>
                           <button
                             onClick={() => deleteExpense(exp.id)}
-                            className="text-textMuted hover:text-danger transition-colors opacity-0 group-hover:opacity-100 text-sm px-1 shrink-0"
+                            className="text-textMuted hover:text-danger transition-colors text-sm px-1 shrink-0"
                             title="Slett"
                           >
                             ✕
@@ -652,85 +652,86 @@ export default function EconomyPage() {
                 ))}
               </div>
 
-              {/* Category management */}
-              {categories.length > 0 && (
-                <section className="bg-surface rounded-xl border border-border p-5">
-                  <h2 className="text-sm font-semibold text-textPrimary mb-3">Kategorier</h2>
-                  <div className="space-y-1">
-                    {categories.map(cat => {
-                      const isEditing = editingCatId === cat.id;
-                      if (isEditing) {
-                        return (
-                          <form
-                            key={cat.id}
-                            onSubmit={handleSaveCategory}
-                            className="p-3 bg-surfaceElevated rounded-xl border border-accent/30 space-y-3"
-                          >
-                            <input
-                              type="text"
-                              value={editCatName}
-                              onChange={e => setEditCatName(e.target.value)}
-                              className="input-base text-sm"
-                              autoFocus
-                              required
-                            />
-                            <div className="flex gap-2 flex-wrap">
-                              {PALETTE.map(c => (
-                                <button
-                                  key={c}
-                                  type="button"
-                                  onClick={() => setEditCatColor(c)}
-                                  className="w-6 h-6 rounded-full transition-transform hover:scale-110 shrink-0"
-                                  style={{ background: c, outline: editCatColor === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}
-                                />
-                              ))}
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="submit"
-                                disabled={!editCatName.trim() || editCatSaving}
-                                className="px-3 py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
-                              >
-                                {editCatSaving ? "Lagrer…" : "Lagre"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingCatId(null)}
-                                className="px-3 py-1.5 rounded-lg text-textMuted text-xs hover:text-textSecondary transition-colors"
-                              >
-                                Avbryt
-                              </button>
-                            </div>
-                          </form>
-                        );
-                      }
-                      return (
-                        <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-border hover:bg-white/5 group transition-colors">
-                          <span className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
-                          <span className="flex-1 text-sm text-textPrimary">{cat.name}</span>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => startEditCategory(cat)}
-                              className="text-textMuted hover:text-accent transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-                              title="Rediger"
-                            >
-                              ✎
-                            </button>
-                            <button
-                              onClick={() => deleteCategory(cat.id)}
-                              className="text-textMuted hover:text-danger transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-                              title="Slett"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
             </>
+          )}
+
+          {/* Category management — always visible when categories exist */}
+          {categories.length > 0 && (
+            <section className="bg-surface rounded-xl border border-border p-5">
+              <h2 className="text-sm font-semibold text-textPrimary mb-3">Kategorier</h2>
+              <div className="space-y-1">
+                {categories.map(cat => {
+                  const isEditing = editingCatId === cat.id;
+                  if (isEditing) {
+                    return (
+                      <form
+                        key={cat.id}
+                        onSubmit={handleSaveCategory}
+                        className="p-3 bg-surfaceElevated rounded-xl border border-accent/30 space-y-3"
+                      >
+                        <input
+                          type="text"
+                          value={editCatName}
+                          onChange={e => setEditCatName(e.target.value)}
+                          className="input-base text-sm"
+                          autoFocus
+                          required
+                        />
+                        <div className="flex gap-2 flex-wrap">
+                          {PALETTE.map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setEditCatColor(c)}
+                              className="w-6 h-6 rounded-full transition-transform hover:scale-110 shrink-0"
+                              style={{ background: c, outline: editCatColor === c ? `3px solid ${c}` : "none", outlineOffset: "2px" }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={!editCatName.trim() || editCatSaving}
+                            className="px-3 py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
+                          >
+                            {editCatSaving ? "Lagrer…" : "Lagre"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatId(null)}
+                            className="px-3 py-1.5 rounded-lg text-textMuted text-xs hover:text-textSecondary transition-colors"
+                          >
+                            Avbryt
+                          </button>
+                        </div>
+                      </form>
+                    );
+                  }
+                  return (
+                    <div key={cat.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:border-border hover:bg-white/5 transition-colors">
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
+                      <span className="flex-1 text-sm text-textPrimary">{cat.name}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => startEditCategory(cat)}
+                          className="text-textMuted hover:text-accent transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+                          title="Rediger"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteCategory(cat.id)}
+                          className="text-textMuted hover:text-danger transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+                          title="Slett"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           )}
         </>
       )}
