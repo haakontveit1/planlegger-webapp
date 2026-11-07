@@ -64,15 +64,20 @@ function computeGoalLine(
       cur.setDate(cur.getDate() + 1);
     }
   } else {
-    const { rateKgPerWeek, startDate, startWeight } = goal;
-    if (!startDate || isNaN(startWeight) || isNaN(rateKgPerWeek)) return [];
+    const { rateKgPerWeek } = goal;
+    if (isNaN(rateKgPerWeek)) return [];
     const ratePerDay = rateKgPerWeek / 7;
-    const goalStart = new Date(startDate + "T00:00:00");
+    // Anchor on latest log so the line always starts from current weight
+    const sortedLogs = [...logs].sort((a, b) => a.date.localeCompare(b.date));
+    const latestLog = sortedLogs[sortedLogs.length - 1];
+    if (!latestLog) return [];
+    const anchorDate = new Date(latestLog.date + "T00:00:00");
+    const anchorWeight = latestLog.weightKg;
     const end = new Date(); end.setDate(end.getDate() + 90);
-    const cur = new Date(goalStart);
+    const cur = new Date(anchorDate);
     while (cur <= end) {
-      const days = (cur.getTime() - goalStart.getTime()) / 86400000;
-      const goalVal = Math.round((startWeight + ratePerDay * days) * 100) / 100;
+      const days = (cur.getTime() - anchorDate.getTime()) / 86400000;
+      const goalVal = Math.round((anchorWeight + ratePerDay * days) * 100) / 100;
       if (!isNaN(goalVal)) result.push({ date: localDateStr(cur), goal: goalVal });
       cur.setDate(cur.getDate() + 1);
     }
@@ -164,7 +169,8 @@ export default function WeightTrackingPage() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   async function loadMeasurements() {
-    const data: Row[] = await fetch("/api/withings/measurements").then(r => r.json()).catch(() => []);
+    const data: Row[] = await fetch(`/api/withings/measurements?t=${Date.now()}`, { cache: "no-store" })
+      .then(r => r.json()).catch(() => []);
     setRows(data);
   }
 

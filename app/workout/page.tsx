@@ -168,7 +168,7 @@ function extractSessions(csvText: string): LiftSession[] {
 // ── Chart computation ─────────────────────────────────────────────────────────
 
 interface ChartResult {
-  points: { date: string; actual: number | null; proj: number | null; bestWeight?: number; bestReps?: number }[];
+  points: { date: string; actual: number | null; proj: number | null; bestWeight?: number; bestReps?: number; projReps?: number }[];
   projectedDate: Date | null;
   latestOrm: number | null;
 }
@@ -215,7 +215,8 @@ function buildChart(sessions: LiftSession[], ex: string, repType: "low" | "high"
     while (cur <= endDate) {
       const dx = (cur.getTime() - t0) / 86400000;
       const v  = Math.round((slope * dx + intercept) * 10) / 10;
-      points.push({ date: fmtDate(localStr(cur)), actual: null, proj: Math.min(v, goal * 1.05) });
+      const targetReps = repType === "low" ? 4 : 6;
+      points.push({ date: fmtDate(localStr(cur)), actual: null, proj: Math.min(v, goal * 1.05), projReps: targetReps });
       cur.setDate(cur.getDate() + 7);
     }
   }
@@ -262,6 +263,11 @@ function LiftTooltip(props: { active?: boolean; payload?: any[]; label?: string 
             {isActual && entry.payload.bestWeight != null && entry.payload.bestReps != null && (
               <span style={{ color: "#9ca3af", fontSize: 10 }}>
                 {" "}({entry.payload.bestWeight} kg × {entry.payload.bestReps})
+              </span>
+            )}
+            {!isActual && entry.payload.projReps != null && (
+              <span style={{ color: "#9ca3af", fontSize: 10 }}>
+                {" "}(≈ {Math.round(entry.value / (1 + entry.payload.projReps / 30))} kg × {entry.payload.projReps})
               </span>
             )}
           </p>
@@ -374,12 +380,17 @@ export default function WorkoutPage() {
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-textSecondary">{label}</p>
                       {latestOrm != null && (
-                        <p className="text-sm font-bold" style={{ color: lift.color }}>
-                          ~{latestOrm} kg
-                          {progress != null && (
-                            <span className="text-xs text-textMuted font-normal ml-1.5">({progress}% av mål)</span>
-                          )}
-                        </p>
+                        <div className="text-right">
+                          <p className="text-sm font-bold" style={{ color: lift.color }}>
+                            ~{latestOrm} kg 1RM
+                            {progress != null && (
+                              <span className="text-xs text-textMuted font-normal ml-1.5">({progress}% av mål)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-textMuted">
+                            ≈ {Math.round(latestOrm / (1 + (rep === "low" ? 4 : 6) / 30))} kg × {rep === "low" ? 4 : 6}
+                          </p>
+                        </div>
                       )}
                     </div>
 
@@ -406,9 +417,15 @@ export default function WorkoutPage() {
                     {projectedDate ? (
                       <div className="text-xs text-textMuted space-y-0.5">
                         <p>
-                          Estimert {lift.goal} kg:{" "}
+                          Estimert {lift.goal} kg 1RM:{" "}
                           <span className="text-textSecondary font-medium">
                             {projectedDate.toLocaleDateString("no-NO", { day: "numeric", month: "long", year: "numeric" })}
+                          </span>
+                        </p>
+                        <p>
+                          Det vil si:{" "}
+                          <span className="text-textSecondary font-medium">
+                            ≈ {Math.round(lift.goal / (1 + (rep === "low" ? 4 : 6) / 30))} kg × {rep === "low" ? 4 : 6}
                           </span>
                         </p>
                         {bw != null && (

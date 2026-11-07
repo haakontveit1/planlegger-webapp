@@ -166,6 +166,7 @@ export default function PlannerPage() {
 
   const [localOrder, setLocalOrder] = useState<Task[] | null>(null);
   const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+  const [backlogCollapsed, setBacklogCollapsed] = useState(false);
 
   // Edit state for day tasks
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -306,6 +307,19 @@ export default function PlannerPage() {
                         >
                           ✎
                         </button>
+                        {isToday && (
+                          <button
+                            onClick={() => {
+                              const d = new Date(); d.setDate(d.getDate() + 1);
+                              const tStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                              moveToToday(task.id, task.durationMinutes ?? undefined, tStr);
+                            }}
+                            className="hidden md:block text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded hover:bg-white/5"
+                            title="Move to tomorrow"
+                          >
+                            → morgen
+                          </button>
+                        )}
                         <button onClick={() => moveToBacklog(task.id)}
                           className="hidden md:block text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5">
                           ← backlog
@@ -324,12 +338,20 @@ export default function PlannerPage() {
 
           {/* Backlog */}
           <div className="bg-surface rounded-xl border border-border p-5">
-            <h2 className="section-label mb-4">
-              Backlog {backlogTasks.length > 0 && <span className="text-textMuted">({backlogTasks.length})</span>}
-            </h2>
-            {backlogTasks.length === 0 ? (
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-label">
+                Backlog {backlogTasks.length > 0 && <span className="text-textMuted">({backlogTasks.length})</span>}
+              </h2>
+              <button
+                onClick={() => setBacklogCollapsed(v => !v)}
+                className="text-xs text-textMuted hover:text-textSecondary transition-colors px-2 py-1 rounded hover:bg-white/5"
+              >
+                {backlogCollapsed ? "▼ Vis" : "▲ Skjul"}
+              </button>
+            </div>
+            {!backlogCollapsed && backlogTasks.length === 0 ? (
               <p className="text-sm text-textMuted py-4 text-center">Backlog is empty</p>
-            ) : (
+            ) : !backlogCollapsed ? (
               <div className="space-y-1">
                 {backlogTasks.map((task) => {
                   if (editingBacklogId === task.id) {
@@ -383,7 +405,7 @@ export default function PlannerPage() {
                   );
                 })}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
