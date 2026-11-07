@@ -225,12 +225,11 @@ function buildChart(sessions: LiftSession[], ex: string, repType: "low" | "high"
 }
 
 function projBodyWeight(wg: WeightGoal | null, target: Date, curWeight: number | null): number | null {
-  if (!wg) return null;
+  if (!wg || !curWeight) return null;
   if (wg.type === "rate") {
-    const days = (target.getTime() - new Date(wg.startDate + "T00:00:00").getTime()) / 86400000;
-    return Math.round((wg.startWeight + (wg.rateKgPerWeek / 7) * days) * 10) / 10;
+    const daysFromNow = (target.getTime() - Date.now()) / 86400000;
+    return Math.round((curWeight + (wg.rateKgPerWeek / 7) * daysFromNow) * 10) / 10;
   }
-  if (!curWeight) return null;
   const now = Date.now();
   const end = new Date(wg.targetDate + "T00:00:00").getTime();
   if (end <= now) return wg.targetWeight;

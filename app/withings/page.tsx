@@ -64,20 +64,15 @@ function computeGoalLine(
       cur.setDate(cur.getDate() + 1);
     }
   } else {
-    const { rateKgPerWeek } = goal;
-    if (isNaN(rateKgPerWeek)) return [];
+    const { rateKgPerWeek, startDate, startWeight } = goal;
+    if (!startDate || isNaN(startWeight) || isNaN(rateKgPerWeek)) return [];
     const ratePerDay = rateKgPerWeek / 7;
-    // Anchor on latest log so the line always starts from current weight
-    const sortedLogs = [...logs].sort((a, b) => a.date.localeCompare(b.date));
-    const latestLog = sortedLogs[sortedLogs.length - 1];
-    if (!latestLog) return [];
-    const anchorDate = new Date(latestLog.date + "T00:00:00");
-    const anchorWeight = latestLog.weightKg;
+    const goalStart = new Date(startDate + "T00:00:00");
     const end = new Date(); end.setDate(end.getDate() + 90);
-    const cur = new Date(anchorDate);
+    const cur = new Date(goalStart);
     while (cur <= end) {
-      const days = (cur.getTime() - anchorDate.getTime()) / 86400000;
-      const goalVal = Math.round((anchorWeight + ratePerDay * days) * 100) / 100;
+      const days = (cur.getTime() - goalStart.getTime()) / 86400000;
+      const goalVal = Math.round((startWeight + ratePerDay * days) * 100) / 100;
       if (!isNaN(goalVal)) result.push({ date: localDateStr(cur), goal: goalVal });
       cur.setDate(cur.getDate() + 1);
     }
