@@ -183,11 +183,15 @@ export default function WeightTrackingPage() {
   const [debugOutput, setDebugOutput] = useState<string | null>(null);
   const [debugging, setDebugging] = useState(false);
 
+  const [measurementsDebug, setMeasurementsDebug] = useState<string | null>(null);
+
   async function loadMeasurements() {
     setRows([]);
-    const data: Row[] = await fetch(`/api/withings/measurements?t=${Date.now()}`, { cache: "no-store" })
-      .then(r => r.json()).catch(() => []);
+    const res = await fetch(`/api/withings/measurements?t=${Date.now()}`, { cache: "no-store" })
+      .then(r => r.json()).catch(() => ({ rows: [], _debug: { error: "fetch failed" } }));
+    const data: Row[] = res.rows ?? res; // handle both old and new shape
     setRows(data);
+    if (res._debug) setMeasurementsDebug(JSON.stringify(res._debug));
   }
 
   useEffect(() => {
@@ -531,6 +535,9 @@ export default function WeightTrackingPage() {
             </div>
             {syncMsg && (
               <p className={`text-xs ${needsReconnect ? "text-red-400" : "text-textMuted"}`}>{syncMsg}</p>
+            )}
+            {measurementsDebug && (
+              <p className="text-xs text-textMuted font-mono">{measurementsDebug}</p>
             )}
             {needsReconnect && (
               <a
