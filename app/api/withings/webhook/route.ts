@@ -89,7 +89,6 @@ export async function POST(req: Request) {
     },
     body: new URLSearchParams({
       action: "getmeas",
-      category: "1",
       startdate,
       enddate,
     }),
