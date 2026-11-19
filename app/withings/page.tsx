@@ -162,8 +162,10 @@ export default function WeightTrackingPage() {
   const [withingsLoading, setWithingsLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
 
   async function loadMeasurements() {
+    setRows([]);
     const data: Row[] = await fetch(`/api/withings/measurements?t=${Date.now()}`, { cache: "no-store" })
       .then(r => r.json()).catch(() => []);
     setRows(data);
@@ -239,9 +241,10 @@ export default function WeightTrackingPage() {
   async function handleSync() {
     setSyncing(true);
     setSyncMsg(null);
+    setNeedsReconnect(false);
     try {
       const res = await fetch("/api/withings/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ days: 180 }) });
-      const data = await res.json() as { ok?: boolean; count?: number; error?: string };
+      const data = await res.json() as { ok?: boolean; count?: number; error?: string; reconnect?: boolean };
       if (data.ok) {
         setSyncMsg(`Synkronisert ${data.count ?? 0} målinger`);
         await loadMeasurements();
@@ -249,6 +252,7 @@ export default function WeightTrackingPage() {
         setWeightLogs(updated);
       } else {
         setSyncMsg(data.error ?? "Noe gikk galt");
+        if (data.reconnect) setNeedsReconnect(true);
       }
     } catch {
       setSyncMsg("Noe gikk galt");
@@ -418,7 +422,7 @@ export default function WeightTrackingPage() {
             <h2 className="text-xl font-bold text-textPrimary">Withings kroppsmålinger</h2>
             <p className="text-sm text-textMuted mt-1">Kroppsmålinger fra smart-vekten</p>
           </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="flex flex-col items-end gap-2 shrink-0">
             <button
               onClick={handleSync}
               disabled={syncing}
@@ -426,7 +430,17 @@ export default function WeightTrackingPage() {
             >
               {syncing ? "Synkroniserer…" : "Synkroniser historikk"}
             </button>
-            {syncMsg && <p className="text-xs text-textMuted">{syncMsg}</p>}
+            {syncMsg && (
+              <p className={`text-xs ${needsReconnect ? "text-red-400" : "text-textMuted"}`}>{syncMsg}</p>
+            )}
+            {needsReconnect && (
+              <a
+                href="/api/withings/auth"
+                className="px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 text-xs font-semibold transition-colors"
+              >
+                Koble til Withings på nytt →
+              </a>
+            )}
           </div>
         </div>
 

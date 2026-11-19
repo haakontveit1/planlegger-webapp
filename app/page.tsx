@@ -299,10 +299,10 @@ export default function PlannerPage() {
                         </div>
                         {task.notes && <p className="text-xs text-textMuted mt-0.5 break-words pl-4">{task.notes}</p>}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => { setEditingId(task.id); setEditTitle(task.title); }}
-                          className="text-textMuted hover:text-textSecondary transition-colors text-sm px-1"
+                          className="text-textMuted hover:text-textSecondary transition-colors text-sm px-1 opacity-0 group-hover:opacity-100"
                           title="Edit"
                         >
                           ✎
@@ -314,7 +314,7 @@ export default function PlannerPage() {
                               const tStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
                               moveToToday(task.id, task.durationMinutes ?? undefined, tStr);
                             }}
-                            className="hidden md:block text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded hover:bg-white/5"
+                            className="hidden md:block text-xs text-textMuted hover:text-accent transition-colors px-2 py-1 rounded hover:bg-white/5 opacity-0 group-hover:opacity-100"
                             title="Move to tomorrow"
                           >
                             → morgen
@@ -325,7 +325,7 @@ export default function PlannerPage() {
                           ← backlog
                         </button>
                         <button onClick={() => deleteTask(task.id)}
-                          className="text-textMuted hover:text-red-400 transition-colors text-sm px-1">
+                          className="text-textMuted hover:text-red-400 transition-colors text-sm px-1 opacity-0 group-hover:opacity-100">
                           ✕
                         </button>
                       </div>

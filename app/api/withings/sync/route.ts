@@ -48,7 +48,7 @@ const MEAS_TYPES = new Set([1, 5, 6, 8, 76, 77, 88]);
 export async function POST(req: Request) {
   const result = await getValidToken();
   if (!result) {
-    return NextResponse.json({ error: "Not connected" }, { status: 401 });
+    return NextResponse.json({ error: "Not connected", reconnect: true }, { status: 401 });
   }
 
   const { token } = result;
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
   };
 
   if (measureData.status !== 0) {
-    return NextResponse.json({ error: `Withings API error (status ${measureData.status})` }, { status: 500 });
+    return NextResponse.json({ error: `Withings API feil (status ${measureData.status}) — prøv å koble til på nytt`, reconnect: measureData.status === 401 }, { status: 500 });
   }
 
   const groups = measureData.body?.measuregrps ?? [];
