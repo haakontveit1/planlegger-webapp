@@ -66,31 +66,42 @@ export async function POST(req: Request) {
     )
   `;
 
-  const measureRes = await fetch("https://wbsapi.withings.net/measure", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
+  type MeasGroup = { date: number; measures: Array<{ type: number; value: number; unit: number }> };
+  type MeasResponse = {
+    status: number;
+    body: { measuregrps: MeasGroup[]; more?: number; offset?: number };
+  };
+
+  async function fetchPage(offset?: number): Promise<MeasResponse> {
+    const params: Record<string, string> = {
       action: "getmeas",
       startdate: String(startdate),
       enddate: String(enddate),
-    }),
-  });
-
-  const measureData = await measureRes.json() as {
-    status: number;
-    body: { measuregrps: Array<{ date: number; measures: Array<{ type: number; value: number; unit: number }> }> };
-  };
-
-  if (measureData.status !== 0) {
-    return NextResponse.json({ error: `Withings API feil (status ${measureData.status}) — prøv å koble til på nytt`, reconnect: measureData.status === 401 }, { status: 500 });
+    };
+    if (offset != null) params.offset = String(offset);
+    const res = await fetch("https://wbsapi.withings.net/measure", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params),
+    });
+    return res.json();
   }
 
-  const groups = measureData.body?.measuregrps ?? [];
+  // Collect all groups across pages
+  const allGroups: MeasGroup[] = [];
+  let offset: number | undefined;
+  for (let page = 0; page < 20; page++) {
+    const data = await fetchPage(offset);
+    if (data.status !== 0) {
+      return NextResponse.json({ error: `Withings API feil (status ${data.status}) — prøv å koble til på nytt`, reconnect: data.status === 401 }, { status: 500 });
+    }
+    allGroups.push(...(data.body?.measuregrps ?? []));
+    if (!data.body?.more) break;
+    offset = data.body.offset;
+  }
+
   let count = 0;
-  for (const group of groups) {
+  for (const group of allGroups) {
     const dateStr = toDateStr(group.date);
     for (const measure of group.measures) {
       if (!MEAS_TYPES.has(measure.type)) continue;
