@@ -13,6 +13,8 @@ type WeightGoal =
   | { type: "target-date"; targetDate: string; targetWeight: number }
   | { type: "rate"; rateKgPerWeek: number; startDate: string; startWeight: number };
 
+type HistoryWindow = "1w" | "1m" | "3m" | "1y" | "all";
+
 type Row = { date: string; type: number; value: number };
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -57,9 +59,12 @@ function computeGoalLine(
     const latestDate = new Date(latest.date + "T00:00:00");
     const endDate = new Date(goal.targetDate + "T00:00:00");
     const totalMs = endDate.getTime() - latestDate.getTime();
-    const cur = new Date(sorted[0].date + "T00:00:00");
+    if (totalMs <= 0) return [];
+    // Start from the latest log entry (not the oldest), going forward to goal date
+    const cur = new Date(latestDate);
     while (cur <= endDate) {
-      const frac = totalMs > 0 ? (cur.getTime() - latestDate.getTime()) / totalMs : 0;
+      const elapsed = cur.getTime() - latestDate.getTime();
+      const frac = elapsed / totalMs;
       result.push({ date: localDateStr(cur), goal: Math.round((latest.weightKg + (goal.targetWeight - latest.weightKg) * frac) * 10) / 10 });
       cur.setDate(cur.getDate() + 1);
     }
@@ -78,6 +83,16 @@ function computeGoalLine(
     }
   }
   return result;
+}
+
+function windowCutoff(w: HistoryWindow): string | null {
+  if (w === "all") return null;
+  const d = new Date();
+  if (w === "1w") d.setDate(d.getDate() - 7);
+  else if (w === "1m") d.setMonth(d.getMonth() - 1);
+  else if (w === "3m") d.setMonth(d.getMonth() - 3);
+  else if (w === "1y") d.setFullYear(d.getFullYear() - 1);
+  return localDateStr(d);
 }
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -156,6 +171,8 @@ export default function WeightTrackingPage() {
   const [weightInput, setWeightInput] = useState("");
   const [weightDateInput, setWeightDateInput] = useState(() => localDateStr(new Date()));
   const [weightSaving, setWeightSaving] = useState(false);
+  const [historyWindow, setHistoryWindow] = useState<HistoryWindow>("3m");
+  const [showFuture, setShowFuture] = useState(true);
 
   // Withings state
   const [rows, setRows] = useState<Row[]>([]);
@@ -228,15 +245,42 @@ export default function WeightTrackingPage() {
   }
 
   const weightChartData = useMemo(() => {
-    const sorted = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
+    const cutoff = windowCutoff(historyWindow);
+    const sortedLogs = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
+    const filteredLogs = cutoff ? sortedLogs.filter(w => w.date >= cutoff) : sortedLogs;
+
     const goalLine = weightGoal ? computeGoalLine(weightLogs, weightGoal) : [];
     const goalMap = new Map(goalLine.map(g => [g.date, g.goal]));
-    return sorted.map(w => ({
-      date: fmtDate(w.date),
-      weight: w.weightKg,
-      goal: goalMap.get(w.date) ?? null,
-    }));
-  }, [weightLogs, weightGoal]);
+    const weightMap = new Map(sortedLogs.map(w => [w.date, w.weightKg]));
+
+    // All dates we want to render
+    const datesToShow = new Set<string>(filteredLogs.map(w => w.date));
+
+    // Add future goal-line points at weekly intervals up to goal date
+    if (showFuture && weightGoal) {
+      const today = new Date();
+      const goalEndStr = weightGoal.type === "target-date"
+        ? weightGoal.targetDate
+        : localDateStr(new Date(Date.now() + 90 * 86400000));
+      const cur = new Date(today);
+      cur.setDate(cur.getDate() + 7);
+      while (localDateStr(cur) <= goalEndStr) {
+        datesToShow.add(localDateStr(cur));
+        cur.setDate(cur.getDate() + 7);
+      }
+      // Always include the exact goal end date
+      datesToShow.add(goalEndStr);
+    }
+
+    return Array.from(datesToShow)
+      .sort()
+      .map(date => ({
+        date: fmtDate(date),
+        weight: weightMap.get(date) ?? null,
+        goal: goalMap.get(date) ?? null,
+      }))
+      .filter(p => p.weight !== null || p.goal !== null);
+  }, [weightLogs, weightGoal, historyWindow, showFuture]);
 
   async function handleSync() {
     setSyncing(true);
@@ -353,6 +397,37 @@ export default function WeightTrackingPage() {
             </div>
           </form>
         )}
+
+        {/* Chart controls */}
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-1">
+            {(["1w", "1m", "3m", "1y", "all"] as HistoryWindow[]).map(w => (
+              <button
+                key={w}
+                onClick={() => setHistoryWindow(w)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  historyWindow === w
+                    ? "bg-accent/15 text-accent"
+                    : "text-textMuted hover:text-textSecondary hover:bg-white/5"
+                }`}
+              >
+                {w === "1w" ? "1 uke" : w === "1m" ? "1 mnd" : w === "3m" ? "3 mnd" : w === "1y" ? "1 år" : "Alt"}
+              </button>
+            ))}
+          </div>
+          {weightGoal && (
+            <button
+              onClick={() => setShowFuture(v => !v)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                showFuture
+                  ? "bg-accent/15 text-accent"
+                  : "text-textMuted hover:text-textSecondary hover:bg-white/5"
+              }`}
+            >
+              {showFuture ? "Skjul fremtid" : "Vis fremtid"}
+            </button>
+          )}
+        </div>
 
         {weightChartData.filter(d => d.weight != null).length === 0 ? (
           <EmptyChart message="Ingen vektmålinger ennå — bruk skjemaet nedenfor" />
