@@ -85,7 +85,7 @@ export async function GET() {
         groups_returned: testData.body?.measuregrps?.length ?? 0,
         more: testData.body?.more ?? 0,
         offset: testData.body?.offset,
-        types_seen: [...new Set(testData.body?.measuregrps?.flatMap(g => g.measures.map(m => m.type)) ?? [])].sort(),
+        types_seen: Array.from(new Set(testData.body?.measuregrps?.flatMap(g => g.measures.map(m => m.type)) ?? [])).sort(),
         date_range_requested: { startdate, enddate, days: 7 },
         dates_in_response: testData.body?.measuregrps?.map(g => new Date(g.date * 1000).toISOString().split("T")[0]).sort() ?? [],
         raw_first_group: testData.body?.measuregrps?.[0] ?? null,
