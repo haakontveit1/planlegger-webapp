@@ -132,7 +132,7 @@ function MetricChart({
         </div>
       </div>
       <p className="text-xs text-textMuted mb-4">
-        {data.length} målinger · endring{" "}
+        {data.length} målinger · siste: {fmtDate(data[data.length - 1].date)} · endring{" "}
         <span className={delta >= 0 ? "text-green-400" : "text-red-400"}>
           {sign}{delta.toFixed(decimals)} {unit}
         </span>
