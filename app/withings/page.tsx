@@ -180,6 +180,8 @@ export default function WeightTrackingPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [needsReconnect, setNeedsReconnect] = useState(false);
+  const [debugOutput, setDebugOutput] = useState<string | null>(null);
+  const [debugging, setDebugging] = useState(false);
 
   async function loadMeasurements() {
     setRows([]);
@@ -281,6 +283,19 @@ export default function WeightTrackingPage() {
       }))
       .filter(p => p.weight !== null || p.goal !== null);
   }, [weightLogs, weightGoal, historyWindow, showFuture]);
+
+  async function handleDebug() {
+    setDebugging(true);
+    setDebugOutput(null);
+    try {
+      const res = await fetch(`/api/withings/debug?t=${Date.now()}`, { cache: "no-store" });
+      const data = await res.json();
+      setDebugOutput(JSON.stringify(data, null, 2));
+    } catch (e) {
+      setDebugOutput(`Fetch error: ${e}`);
+    }
+    setDebugging(false);
+  }
 
   async function handleSync() {
     setSyncing(true);
@@ -498,13 +513,22 @@ export default function WeightTrackingPage() {
             <p className="text-sm text-textMuted mt-1">Kroppsmålinger fra smart-vekten</p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="px-4 py-2 rounded-xl bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
-            >
-              {syncing ? "Synkroniserer…" : "Synkroniser historikk"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDebug}
+                disabled={debugging}
+                className="px-3 py-2 rounded-xl bg-white/5 text-textMuted text-sm hover:text-textSecondary hover:bg-white/8 transition-colors disabled:opacity-40"
+              >
+                {debugging ? "Sjekker…" : "Debug"}
+              </button>
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="px-4 py-2 rounded-xl bg-accent/15 text-accent text-sm font-semibold hover:bg-accent/25 transition-colors disabled:opacity-40"
+              >
+                {syncing ? "Synkroniserer…" : "Synkroniser historikk"}
+              </button>
+            </div>
             {syncMsg && (
               <p className={`text-xs ${needsReconnect ? "text-red-400" : "text-textMuted"}`}>{syncMsg}</p>
             )}
@@ -518,6 +542,16 @@ export default function WeightTrackingPage() {
             )}
           </div>
         </div>
+
+        {debugOutput && (
+          <div className="mb-4 rounded-xl border border-border bg-surfaceElevated p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-textMuted uppercase tracking-wide">Debug output</span>
+              <button onClick={() => setDebugOutput(null)} className="text-xs text-textMuted hover:text-textSecondary">✕ Lukk</button>
+            </div>
+            <pre className="text-xs text-textSecondary overflow-x-auto whitespace-pre-wrap break-all">{debugOutput}</pre>
+          </div>
+        )}
 
         {withingsLoading && <p className="text-textMuted text-sm">Laster målinger…</p>}
 
